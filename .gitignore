@@ -1,0 +1,9 @@
+target/
+# 模型 32 MB, 由外部提供路径, 不进仓库
+models/
+.DS_Store
+# 真实扫描件绝不进仓库
+*.pdf
+*.docx
+*.xlsx
+!spike/testdata/*.png

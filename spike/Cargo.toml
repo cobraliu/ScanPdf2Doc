@@ -1,0 +1,23 @@
+[package]
+name = "spike"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "移动端可行性验证: 一张照片 -> 识别 -> docx, 不带 UI, 不碰 pdfium"
+license = "Apache-2.0"
+
+[dependencies]
+# 识别与版面重建核心, 直接吃桌面版那个仓库的 v0.1.0
+# default-features = false 是关掉 gui: eframe/wgpu 那一坨在手机上一点用没有
+scannedpdf2doc = { git = "https://github.com/cobraliu/ScannedPdf2Doc-rust", tag = "v0.1.0", default-features = false }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+anyhow = "1"
+libc = "0.2"          # 只为读 getrusage 拿峰值内存
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+# 故意不设 panic = "abort": 算子缺失这类问题是从 panic 栈里看出来的,
+# 手机上本来就难调, 别再把唯一的线索砍掉
