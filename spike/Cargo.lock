@@ -818,8 +818,8 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "scannedpdf2doc"
-version = "0.1.0"
-source = "git+https://github.com/cobraliu/ScannedPdf2Doc-rust?tag=v0.1.0#c4eb47398aed7e7c52af3bc3097bff4be038aca3"
+version = "0.1.1"
+source = "git+https://github.com/cobraliu/ScannedPdf2Doc-rust?tag=v0.1.1#93fc5897f1af6d663269443d88864e3641521d53"
 dependencies = [
  "anyhow",
  "chrono",

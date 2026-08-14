@@ -16,6 +16,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Context, Result};
 use scannedpdf2doc::config::Config;
 use scannedpdf2doc::imgutil::Gray;
+use scannedpdf2doc::ocr::EngineOptions;
 use scannedpdf2doc::{docx, layout, ocr, render};
 
 fn main() {
@@ -28,7 +29,17 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<String> = std::env::args().collect();
     if a.len() < 3 {
-        eprintln!("用法: spike <模型目录> <照片.jpg> [输出.docx] [--long-edge N]");
+        eprintln!(
+            "用法: spike <模型目录> <照片.jpg> [输出.docx] [选项]\n\
+             \n\
+             选项 (都是拿时间换内存, 不动像素, 结果逐字不变):\n\
+             \x20 --long-edge N   整页缩到的长边, 默认 2560\n\
+             \x20 --threads N     算子内部线程数, 默认跟核心数\n\
+             \x20 --no-arena      关掉 ORT 的内存池\n\
+             \x20 --no-mempattern 关掉按首次形状的预分配\n\
+             \x20 --lazy          三个 session 轮流上场, 用完就放\n\
+             \x20 --det-max-side N 只给检测输入封长边(会改结果, 见 README)"
+        );
         std::process::exit(2);
     }
     let models = PathBuf::from(&a[1]);
@@ -44,17 +55,48 @@ fn run() -> Result<()> {
             .and_then(|v| v.parse().ok())
             .ok_or_else(|| anyhow!("--long-edge 后面要跟一个数"))?;
     }
+    let mut eo = EngineOptions::default();
+    if let Some(i) = a.iter().position(|s| s == "--threads") {
+        eo.intra_threads = Some(
+            a.get(i + 1)
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| anyhow!("--threads 后面要跟一个数"))?,
+        );
+    }
+    eo.arena = !a.iter().any(|s| s == "--no-arena");
+    eo.memory_pattern = !a.iter().any(|s| s == "--no-mempattern");
+    eo.lazy = a.iter().any(|s| s == "--lazy");
+    if let Some(i) = a.iter().position(|s| s == "--det-max-side") {
+        eo.det_max_side = Some(
+            a.get(i + 1)
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| anyhow!("--det-max-side 后面要跟一个数"))?,
+        );
+    }
 
     println!("目标平台: {}", std::env::consts::ARCH);
     println!("可用核心: {}", threads());
-    println!("长边设定: {} px\n", cfg.long_edge);
+    println!("长边设定: {} px", cfg.long_edge);
+    println!(
+        "内存开关: 线程 {} / arena {} / mempattern {} / lazy {}\n",
+        eo.intra_threads
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| format!("{}(全部)", threads())),
+        onoff(eo.arena),
+        onoff(eo.memory_pattern),
+        onoff(eo.lazy),
+    );
 
     // ---- 1. 建三个 ONNX session ----
     // 这一步过了, 第一个问题就答完了: 算子不齐会在这里报错而不是产生坏结果
     let t = Instant::now();
-    let mut engine = ocr::Engine::load(&models).context("加载模型")?;
+    let mut engine = ocr::Engine::load_with(&models, eo).context("加载模型")?;
     let t_load = t.elapsed();
-    println!("✓ 三个 session 建成功, 耗时 {:.2}s  (算子齐)", t_load.as_secs_f32());
+    println!(
+        "✓ 三个 session 建成功, 耗时 {:.2}s  (算子齐)   [峰值 {:.1} MB]",
+        t_load.as_secs_f32(),
+        peak_rss_mb()
+    );
 
     // ---- 2. 读照片, 缩到目标长边 ----
     let t = Instant::now();
@@ -71,8 +113,18 @@ fn run() -> Result<()> {
     let t = Instant::now();
     let items = engine.run(&img).context("识别")?;
     let t_ocr = t.elapsed();
-    println!("✓ 识别出 {} 段文字, 耗时 {:.2}s", items.len(), t_ocr.as_secs_f32());
+    let (fp_full, fp_text) = fingerprint(&items);
+    println!(
+        "✓ 识别出 {} 段文字, 耗时 {:.2}s, 指纹 {} 文字 {}   [峰值 {:.1} MB]",
+        items.len(),
+        t_ocr.as_secs_f32(),
+        fp_full,
+        fp_text,
+        peak_rss_mb()
+    );
     if items.is_empty() {
+        // 纯白页当输入时是故意要走到这里的: 它跑完 det 就返回, 上面那行的
+        // 峰值刚好把"检测阶段单独占多少"隔离了出来
         return Err(anyhow!(
             "一段文字都没识别出来 —— 算子虽然齐, 但结果不对, 这比报错更需要查"
         ));
@@ -159,6 +211,52 @@ fn to_gray(p: &Path, long_edge: u32) -> Result<Gray> {
 
 fn threads() -> usize {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(0)
+}
+
+fn onoff(b: bool) -> &'static str {
+    if b {
+        "开"
+    } else {
+        "关"
+    }
+}
+
+/// 全部识别结果的指纹 —— 文字 + 框坐标 + 置信度
+///
+/// "可以慢, 不能错" 这条要求靠肉眼比对文字是不够的: 置信度差一点点、框挪了
+/// 一个像素, 后面的版面重建就可能分出不一样的块。这里把三样都揉进去, 换开关
+/// 之后指纹一致才算真的没变。用 FNV-1a, 够短够稳, 不值得为它拉个依赖。
+/// 返回 (全量指纹, 只看文字的指纹)
+///
+/// 分成两个是有用的: 降检测分辨率必然让框挪几个像素, 全量指纹一定会变, 但那
+/// 不叫"错"。真正要盯的是文字指纹 —— 它一变才是少认了字或者认错了字。
+fn fingerprint(items: &[ocr::Item]) -> (String, String) {
+    let fnv = |f: &dyn Fn(&mut dyn FnMut(&[u8]))| -> String {
+        let mut h: u64 = 0xcbf29ce484222325;
+        f(&mut |b: &[u8]| {
+            for &x in b {
+                h ^= x as u64;
+                h = h.wrapping_mul(0x100000001b3);
+            }
+        });
+        format!("{h:016x}")
+    };
+    let full = fnv(&|eat: &mut dyn FnMut(&[u8])| {
+        for it in items {
+            eat(it.t.as_bytes());
+            // 浮点直接进哈希会被最后一位噪声毁掉, 先量化到 0.01
+            for v in [it.x0, it.y0, it.x1, it.y1, it.s] {
+                eat(&((v * 100.0).round() as i64).to_le_bytes());
+            }
+        }
+    });
+    let text = fnv(&|eat: &mut dyn FnMut(&[u8])| {
+        for it in items {
+            eat(it.t.as_bytes());
+            eat(b"\n");
+        }
+    });
+    (full, text)
 }
 
 fn one_line(s: &str) -> String {
