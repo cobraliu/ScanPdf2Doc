@@ -6,4 +6,6 @@ models/
 *.pdf
 *.docx
 *.xlsx
+# OCR 缓存里是识别出来的全文 —— 原件不进仓库, 它更不能进
+.pdf2doc_cache/
 !spike/testdata/*.png

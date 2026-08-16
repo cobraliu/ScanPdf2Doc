@@ -1,0 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+
+// ort 只发 aarch64 的 iOS 模拟器预编译包, 没有 x86_64 那一版。不排掉的话
+// 模拟器构建会去要 x86_64-apple-ios 然后直接失败。
+// 代价: Intel Mac 上跑不了模拟器版, 真机不受影响
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 x86_64

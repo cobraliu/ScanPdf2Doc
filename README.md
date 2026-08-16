@@ -19,7 +19,7 @@
 |---|---|---|
 | UI | Flutter，两端一套 | 这个 App 的界面逻辑（页列表、拖拽排序、裁剪框）两端完全一样，没有分头写的必要 |
 | 识别 / 版面重建 | Rust 核心，经 flutter_rust_bridge 调用 | 桌面版那套逻辑一行不用重写，两端共用同一份 |
-| iOS 找边 | `VNDetectDocumentSegmentationRequest` | 系统自带，效果好，不额外增体积 |
+| iOS 扫描 | `VNDocumentCameraViewController`（VisionKit） | 系统自带，找边 / 抓拍 / 矫正 / 多页一整套界面都给了，一行 CV 代码不用写 |
 | Android 找边 | ML Kit Document Scanner 优先，OpenCV 兜底 | ML Kit 连拍摄 UI 都给了，但依赖 Google Play 服务；国内机型装不上时退回自己用 OpenCV 找四边形 |
 | 生成 PDF | 端上原生 API | iOS `UIGraphicsPDFRenderer` / Android `PdfDocument`，都不需要额外库 |
 
@@ -29,14 +29,20 @@
 
 ## 现在做到哪了
 
-**已完成：Rust 核心的真机可行性验证**（见 [`spike/`](spike/)）。
+**一、Rust 核心的真机可行性验证**（见 [`spike/`](spike/)）。
 
 不写 UI，先把最不确定的一环拿掉：ONNX Runtime 的移动端预编译包有可能是裁过算子的
 reduced build，缺算子的话整条路都不成立。结果是三个平台（macOS 原生 / iOS Simulator /
 Android arm64）全部跑通，识别出的 31 段文字逐字一致，没有静默降级。
 
-一个需要盯的数：**峰值内存 574–708 MB**，对前台 App 偏高。降长边能线性换下来
-（1024 时降到 377 MB），但降到多少还能保住识别率，得拿实拍样张单独测。
-详细数据和复现方式在 [`spike/README.md`](spike/README.md)。
+峰值内存原本 574–708 MB，对前台 App 偏高；加了 `EngineOptions::low_memory()` 之后
+降到 428–569 MB，识别结果逐字不变。详细数据和复现方式在
+[`spike/README.md`](spike/README.md)。
 
-**下一步**：插真机测实际耗时和热节流，然后开始 Flutter 侧的脚手架。
+**二、iOS App 能跑了**（见 [`app/`](app/)）。
+
+Flutter + flutter_rust_bridge，功能 1、2、3、4 都在：系统扫描界面（自动找边、自动
+抓拍、透视矫正、连续多页）、页列表拖拽排序与删除、导出 PDF、识别成 Word / Excel
+并分享。
+
+**下一步**：真机上量耗时和热节流；然后补 Android 侧的 platform channel。
