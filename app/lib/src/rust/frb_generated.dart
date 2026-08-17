@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/convert.dart';
+import 'api/textlayer.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -67,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 126796527;
+  int get rustContentHash => 111713429;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -78,12 +79,26 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<ConvertReport> crateApiConvertConvertForTest({
+    required String modelDir,
+    required List<String> images,
+    required String outDir,
+    required String title,
+  });
+
   Stream<Progress> crateApiConvertConvertImages({
     required String modelDir,
     required List<String> images,
     required String outDir,
     required String title,
     required OutFormat format,
+    required int longEdge,
+    required bool lowMemory,
+  });
+
+  Stream<OcrProgress> crateApiTextlayerOcrImages({
+    required String modelDir,
+    required List<String> images,
     required int longEdge,
     required bool lowMemory,
   });
@@ -96,6 +111,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required super.generalizedFrbRustBinding,
     required super.portManager,
   });
+
+  @override
+  Future<ConvertReport> crateApiConvertConvertForTest({
+    required String modelDir,
+    required List<String> images,
+    required String outDir,
+    required String title,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(modelDir, serializer);
+          sse_encode_list_String(images, serializer);
+          sse_encode_String(outDir, serializer);
+          sse_encode_String(title, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_convert_report,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiConvertConvertForTestConstMeta,
+        argValues: [modelDir, images, outDir, title],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiConvertConvertForTestConstMeta =>
+      const TaskConstMeta(
+        debugName: "convert_for_test",
+        argNames: ["modelDir", "images", "outDir", "title"],
+      );
 
   @override
   Stream<Progress> crateApiConvertConvertImages({
@@ -124,7 +178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 1,
+              funcId: 2,
               port: port_,
             );
           },
@@ -165,10 +219,61 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ],
       );
 
+  @override
+  Stream<OcrProgress> crateApiTextlayerOcrImages({
+    required String modelDir,
+    required List<String> images,
+    required int longEdge,
+    required bool lowMemory,
+  }) {
+    final sink = RustStreamSink<OcrProgress>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_String(modelDir, serializer);
+            sse_encode_list_String(images, serializer);
+            sse_encode_u_32(longEdge, serializer);
+            sse_encode_bool(lowMemory, serializer);
+            sse_encode_StreamSink_ocr_progress_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 3,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiTextlayerOcrImagesConstMeta,
+          argValues: [modelDir, images, longEdge, lowMemory, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiTextlayerOcrImagesConstMeta => const TaskConstMeta(
+    debugName: "ocr_images",
+    argNames: ["modelDir", "images", "longEdge", "lowMemory", "sink"],
+  );
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return AnyhowException(raw as String);
+  }
+
+  @protected
+  RustStreamSink<OcrProgress> dco_decode_StreamSink_ocr_progress_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
   }
 
   @protected
@@ -211,6 +316,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  double dco_decode_f_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as double;
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -223,9 +334,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<PageText> dco_decode_list_page_text(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_page_text).toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  List<TextBox> dco_decode_list_text_box(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_text_box).toList();
+  }
+
+  @protected
+  OcrProgress dco_decode_ocr_progress(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    switch (raw[0]) {
+      case 0:
+        return OcrProgress_Loading();
+      case 1:
+        return OcrProgress_Page(
+          index: dco_decode_u_32(raw[1]),
+          total: dco_decode_u_32(raw[2]),
+        );
+      case 2:
+        return OcrProgress_Done(pages: dco_decode_list_page_text(raw[1]));
+      default:
+        throw Exception("unreachable");
+    }
   }
 
   @protected
@@ -238,6 +379,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   OutFormat dco_decode_out_format(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return OutFormat.values[raw as int];
+  }
+
+  @protected
+  PageText dco_decode_page_text(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return PageText(
+      boxes: dco_decode_list_text_box(arr[0]),
+      error: dco_decode_opt_String(arr[1]),
+    );
   }
 
   @protected
@@ -263,6 +416,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TextBox dco_decode_text_box(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return TextBox(
+      text: dco_decode_String(arr[0]),
+      x0: dco_decode_f_32(arr[1]),
+      y0: dco_decode_f_32(arr[2]),
+      x1: dco_decode_f_32(arr[3]),
+      y1: dco_decode_f_32(arr[4]),
+    );
+  }
+
+  @protected
   int dco_decode_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -285,6 +453,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_String(deserializer);
     return AnyhowException(inner);
+  }
+
+  @protected
+  RustStreamSink<OcrProgress> sse_decode_StreamSink_ocr_progress_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
   }
 
   @protected
@@ -334,6 +510,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  double sse_decode_f_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getFloat32();
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
@@ -352,10 +534,54 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<PageText> sse_decode_list_page_text(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PageText>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_page_text(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  List<TextBox> sse_decode_list_text_box(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TextBox>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_text_box(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  OcrProgress sse_decode_ocr_progress(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var tag_ = sse_decode_i_32(deserializer);
+    switch (tag_) {
+      case 0:
+        return OcrProgress_Loading();
+      case 1:
+        var var_index = sse_decode_u_32(deserializer);
+        var var_total = sse_decode_u_32(deserializer);
+        return OcrProgress_Page(index: var_index, total: var_total);
+      case 2:
+        var var_pages = sse_decode_list_page_text(deserializer);
+        return OcrProgress_Done(pages: var_pages);
+      default:
+        throw UnimplementedError('');
+    }
   }
 
   @protected
@@ -374,6 +600,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return OutFormat.values[inner];
+  }
+
+  @protected
+  PageText sse_decode_page_text(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_boxes = sse_decode_list_text_box(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return PageText(boxes: var_boxes, error: var_error);
   }
 
   @protected
@@ -396,6 +630,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
+  }
+
+  @protected
+  TextBox sse_decode_text_box(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_text = sse_decode_String(deserializer);
+    var var_x0 = sse_decode_f_32(deserializer);
+    var var_y0 = sse_decode_f_32(deserializer);
+    var var_x1 = sse_decode_f_32(deserializer);
+    var var_y1 = sse_decode_f_32(deserializer);
+    return TextBox(
+      text: var_text,
+      x0: var_x0,
+      y0: var_y0,
+      x1: var_x1,
+      y1: var_y1,
+    );
   }
 
   @protected
@@ -422,6 +673,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_StreamSink_ocr_progress_Sse(
+    RustStreamSink<OcrProgress> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ocr_progress,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
   }
 
   @protected
@@ -473,6 +741,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_f_32(double self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putFloat32(self);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -488,6 +762,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_page_text(
+    List<PageText> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_page_text(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -495,6 +781,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_list_text_box(List<TextBox> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_text_box(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_ocr_progress(OcrProgress self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    switch (self) {
+      case OcrProgress_Loading():
+        sse_encode_i_32(0, serializer);
+      case OcrProgress_Page(index: final index, total: final total):
+        sse_encode_i_32(1, serializer);
+        sse_encode_u_32(index, serializer);
+        sse_encode_u_32(total, serializer);
+      case OcrProgress_Done(pages: final pages):
+        sse_encode_i_32(2, serializer);
+        sse_encode_list_page_text(pages, serializer);
+    }
   }
 
   @protected
@@ -514,6 +825,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_page_text(PageText self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_text_box(self.boxes, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
   void sse_encode_progress(Progress self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     switch (self) {
@@ -529,6 +847,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(3, serializer);
         sse_encode_box_autoadd_convert_report(report, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_text_box(TextBox self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.text, serializer);
+    sse_encode_f_32(self.x0, serializer);
+    sse_encode_f_32(self.y0, serializer);
+    sse_encode_f_32(self.x1, serializer);
+    sse_encode_f_32(self.y1, serializer);
   }
 
   @protected

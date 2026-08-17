@@ -263,7 +263,7 @@ fn one_page(engine: &mut Engine, img: &Gray, cfg: &Config) -> Result<Page> {
 /// PDF 用的是 UIImage, 它认这个标记, 所以导出的 PDF 是正的; image crate 不认,
 /// 拿到的就是一张躺倒的页。躺倒之后每行字会被识别器逐框转正(所以字是对的),
 /// 但行与行在图里从右往左排, 出来的正文整篇倒序 —— 这个坑很难从结果反推。
-fn load_gray(p: &Path, long_edge: u32) -> Result<Gray> {
+pub(crate) fn load_gray(p: &Path, long_edge: u32) -> Result<Gray> {
     let mut dec = ImageReader::open(p)
         .with_context(|| format!("打开 {}", p.display()))?
         .with_guessed_format()

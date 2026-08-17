@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/convert.dart';
+import 'api/textlayer.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -25,6 +26,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
+  RustStreamSink<OcrProgress> dco_decode_StreamSink_ocr_progress_Sse(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<Progress> dco_decode_StreamSink_progress_Sse(dynamic raw);
 
   @protected
@@ -40,13 +46,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ConvertReport dco_decode_convert_report(dynamic raw);
 
   @protected
+  double dco_decode_f_32(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<PageText> dco_decode_list_page_text(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<TextBox> dco_decode_list_text_box(dynamic raw);
+
+  @protected
+  OcrProgress dco_decode_ocr_progress(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -55,7 +73,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OutFormat dco_decode_out_format(dynamic raw);
 
   @protected
+  PageText dco_decode_page_text(dynamic raw);
+
+  @protected
   Progress dco_decode_progress(dynamic raw);
+
+  @protected
+  TextBox dco_decode_text_box(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -68,6 +92,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+
+  @protected
+  RustStreamSink<OcrProgress> sse_decode_StreamSink_ocr_progress_Sse(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RustStreamSink<Progress> sse_decode_StreamSink_progress_Sse(
@@ -89,13 +118,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ConvertReport sse_decode_convert_report(SseDeserializer deserializer);
 
   @protected
+  double sse_decode_f_32(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<PageText> sse_decode_list_page_text(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<TextBox> sse_decode_list_text_box(SseDeserializer deserializer);
+
+  @protected
+  OcrProgress sse_decode_ocr_progress(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -104,7 +145,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   OutFormat sse_decode_out_format(SseDeserializer deserializer);
 
   @protected
+  PageText sse_decode_page_text(SseDeserializer deserializer);
+
+  @protected
   Progress sse_decode_progress(SseDeserializer deserializer);
+
+  @protected
+  TextBox sse_decode_text_box(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -118,6 +165,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_ocr_progress_Sse(
+    RustStreamSink<OcrProgress> self,
     SseSerializer serializer,
   );
 
@@ -143,10 +196,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_convert_report(ConvertReport self, SseSerializer serializer);
 
   @protected
+  void sse_encode_f_32(double self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_page_text(List<PageText> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
@@ -155,13 +214,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_text_box(List<TextBox> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ocr_progress(OcrProgress self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
   void sse_encode_out_format(OutFormat self, SseSerializer serializer);
 
   @protected
+  void sse_encode_page_text(PageText self, SseSerializer serializer);
+
+  @protected
   void sse_encode_progress(Progress self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_text_box(TextBox self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

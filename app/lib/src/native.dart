@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'settings.dart' show PdfOpts;
+
 /// 原生那一侧: 系统扫描界面、出 PDF、读 PDF
 ///
 /// 只有这几件事走 platform channel。它们都强依赖系统 API(VisionKit、
@@ -46,11 +48,50 @@ class Native {
     return r ?? const [];
   }
 
+  /// 顺时针转 90° × turns, 结果写到 out
+  ///
+  /// JPEG 是无损的 —— 原生那侧只改 EXIF 的方向标记, 不重新编码
+  static Future<String> rotatePage(String path, String out, int turns) async {
+    final r = await _ch.invokeMethod<String>('rotatePage', {
+      'path': path,
+      'out': out,
+      'turns': turns,
+    });
+    return r ?? out;
+  }
+
+  /// 按四个角做透视矫正, 结果写到 out
+  ///
+  /// corners 是归一化到 [0,1] 的八个数, 顺序 左上/右上/右下/左下, 原点左上角
+  static Future<String> cropPage(
+      String path, String out, List<double> corners) async {
+    assert(corners.length == 8);
+    final r = await _ch.invokeMethod<String>('cropPage', {
+      'path': path,
+      'out': out,
+      'corners': corners,
+    });
+    return r ?? out;
+  }
+
   /// 把一组页图拼成 PDF, 返回 out
-  static Future<String> makePdf(List<String> images, String out) async {
+  ///
+  /// - [opts] 决定纸张、页边距和图的压缩程度, 见 [PdfOpts]
+  /// - [texts] 每页一组文字框, 铺成看不见的文字层; 传 null 就是纯图片 PDF。
+  ///   每个框是 `{t, x0, y0, x1, y1}`, 坐标归一化到 [0,1], 原点在页面左上角
+  static Future<String> makePdf(
+    List<String> images,
+    String out, {
+    PdfOpts opts = const PdfOpts(),
+    List<List<Map<String, Object>>>? texts,
+  }) async {
     final r = await _ch.invokeMethod<String>('makePdf', {
       'images': images,
       'out': out,
+      'pageSize': opts.size,
+      'marginPt': opts.margin,
+      'maxLongEdge': opts.maxEdge,
+      'texts': ?texts,
     });
     return r ?? out;
   }

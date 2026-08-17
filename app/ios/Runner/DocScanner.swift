@@ -1,3 +1,4 @@
+import CoreImage
 import Flutter
 import ImageIO
 import UIKit
@@ -69,7 +70,36 @@ class DocScanner: NSObject {
                 result(FlutterError(code: "args", message: "makePdf 参数不对", details: nil))
                 return
             }
-            makePdf(images: images, out: out, result)
+            offload(result) {
+                try Self.renderPdf(
+                    images: images,
+                    out: out,
+                    size: a["pageSize"] as? String ?? "a4",
+                    margin: CGFloat(a["marginPt"] as? Double ?? 0),
+                    maxEdge: a["maxLongEdge"] as? Int ?? 0,
+                    texts: a["texts"] as? [Any])
+                return out
+            }
+        case "rotatePage":
+            guard let a = call.arguments as? [String: Any],
+                  let path = a["path"] as? String,
+                  let out = a["out"] as? String,
+                  let turns = a["turns"] as? Int
+            else {
+                result(FlutterError(code: "args", message: "rotatePage 参数不对", details: nil))
+                return
+            }
+            offload(result) { try Self.rotate(path: path, out: out, turns: turns) }
+        case "cropPage":
+            guard let a = call.arguments as? [String: Any],
+                  let path = a["path"] as? String,
+                  let out = a["out"] as? String,
+                  let c = a["corners"] as? [Double], c.count == 8
+            else {
+                result(FlutterError(code: "args", message: "cropPage 参数不对", details: nil))
+                return
+            }
+            offload(result) { try Self.crop(path: path, out: out, corners: c) }
         case "pickPdf":
             pickPdf(result)
         case "pdfPages":
@@ -123,44 +153,258 @@ class DocScanner: NSObject {
         return d
     }
 
-    // MARK: - 出 PDF
-
-    private func makePdf(images: [String], out: String, _ result: @escaping FlutterResult) {
-        // 渲染十几页要好几秒, 放主线程会卡住界面
+    /// 把一件重活挪到后台线程, 干完回主线程交差
+    ///
+    /// 图像那几件事都是几千万像素的活, 放主线程界面会整个卡住。写一遍这个
+    /// 壳子, 后面每加一件都少抄一遍 DispatchQueue 的样板。
+    private func offload(_ result: @escaping FlutterResult, _ body: @escaping () throws -> Any) {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                try self.renderPdf(images: images, out: out)
-                DispatchQueue.main.async { result(out) }
+                let v = try body()
+                DispatchQueue.main.async { result(v) }
             } catch {
                 DispatchQueue.main.async {
-                    result(FlutterError(code: "pdf", message: error.localizedDescription, details: nil))
+                    result(FlutterError(code: "img", message: error.localizedDescription, details: nil))
                 }
             }
         }
     }
 
-    private func renderPdf(images: [String], out: String) throws {
-        let a4 = CGSize(width: 595.276, height: 841.89)
+    // MARK: - 页编辑
+
+    /// 顺时针转 90° × turns, 写到 out
+    ///
+    /// JPEG 走无损路子: 只改 EXIF 的 Orientation 标记, 压缩数据一个字节不动。
+    /// 三条下游全都认这个标记 —— Skia(缩略图)、UIImage(出 PDF)、Rust 那侧
+    /// 自己应用(见 api/convert.rs 的 load_gray)。重新编码一遍才是不必要的:
+    /// 一张 4000×3000 的扫描图转一下就掉一次质量, 转四次回到原位, 已经糊了。
+    private static func rotate(path: String, out: String, turns: Int) throws -> String {
+        let t = ((turns % 4) + 4) % 4
+        let url = URL(fileURLWithPath: path)
+        let data = try Data(contentsOf: url)
+        if t == 0 {
+            try data.write(to: URL(fileURLWithPath: out), options: .atomic)
+            return out
+        }
+
+        // EXIF 的 1/6/3/8 就是 0°/90°/180°/270° 顺时针, 按这个圈往前挪 t 格。
+        // 2/4/5/7 是带镜像的, 极少见, 碰上了退回重画 —— 在圈上接着转会转错
+        let ring: [Int] = [1, 6, 3, 8]
+        if data.count > 3, data[data.startIndex] == 0xFF, data[data.startIndex + 1] == 0xD8 {
+            var cur = 1
+            if let src = CGImageSourceCreateWithData(data as CFData, nil),
+               let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+               let o = props[kCGImagePropertyOrientation] as? Int {
+                cur = o
+            }
+            if let i = ring.firstIndex(of: cur),
+               let tagged = withOrientation(data, UInt8(ring[(i + t) % 4])) {
+                try tagged.write(to: URL(fileURLWithPath: out), options: .atomic)
+                return out
+            }
+        }
+
+        // 非 JPEG(相册里的 png/heic)或带镜像的方向: 老老实实把像素转过来
+        guard let ci = CIImage(contentsOf: url, options: [.applyOrientationProperty: true])
+        else { throw Err("这张图打不开") }
+        // CIImage 的 .right/.left 是按数学正方向说的, 跟"顺时针"正好反着
+        let steps: [CGImagePropertyOrientation] = [.up, .right, .down, .left]
+        try write(ci.oriented(steps[t]), to: out)
+        return out
+    }
+
+    /// 按四个角做透视矫正, 写到 out
+    ///
+    /// corners 是归一化到 [0,1] 的八个数, 顺序 左上/右上/右下/左下, 原点在
+    /// 左上角 —— 也就是 Flutter 那侧屏幕坐标的习惯。
+    private static func crop(path: String, out: String, corners c: [Double]) throws -> String {
+        // applyOrientationProperty: 让 EXIF 的方向先生效。不然用户在界面上照着
+        // 摆正后的图拖的四个角, 到这儿会落在一张躺倒的图上
+        guard let ci = CIImage(contentsOf: URL(fileURLWithPath: path),
+                               options: [.applyOrientationProperty: true])
+        else { throw Err("这张图打不开") }
+        let e = ci.extent
+        guard e.width > 0, e.height > 0 else { throw Err("这张图是空的") }
+
+        // Core Image 的原点在左下, 界面那侧在左上, y 要翻过来
+        func pt(_ i: Int) -> CIVector {
+            CIVector(x: e.minX + CGFloat(c[i * 2]) * e.width,
+                     y: e.minY + CGFloat(1 - c[i * 2 + 1]) * e.height)
+        }
+        guard let f = CIFilter(name: "CIPerspectiveCorrection") else {
+            throw Err("系统不支持透视矫正")
+        }
+        f.setValue(ci, forKey: kCIInputImageKey)
+        f.setValue(pt(0), forKey: "inputTopLeft")
+        f.setValue(pt(1), forKey: "inputTopRight")
+        f.setValue(pt(2), forKey: "inputBottomRight")
+        f.setValue(pt(3), forKey: "inputBottomLeft")
+        guard let o = f.outputImage, o.extent.width >= 1, o.extent.height >= 1 else {
+            throw Err("这四个角框不出一块区域")
+        }
+        try write(o, to: out)
+        return out
+    }
+
+    /// 把一张 CIImage 存成 JPEG
+    ///
+    /// 0.95 跟扫描落盘那边同一个值 —— 识别前还要缩到长边 2560, 压缩噪声叠上
+    /// 重采样最容易糊掉小字
+    private static func write(_ img: CIImage, to out: String) throws {
+        let ctx = CIContext()
+        let space = img.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        // extent 的原点未必在 (0,0) —— 透视矫正出来的图就不在。不搬回原点,
+        // jpegRepresentation 拿到的是一张偏移出画布的空图
+        let shifted = img.transformed(
+            by: CGAffineTransform(translationX: -img.extent.minX, y: -img.extent.minY))
+        guard let data = ctx.jpegRepresentation(
+            of: shifted, colorSpace: space,
+            options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.95])
+        else { throw Err("这张图存不下来") }
+        try data.write(to: URL(fileURLWithPath: out), options: .atomic)
+    }
+
+    // MARK: - 出 PDF
+
+    /// - size: `a4` / `letter` / `fit`(纸张跟着图的长宽比走)
+    /// - margin: 页边距, 点
+    /// - maxEdge: 图的长边压到多少像素; 0 = 用原图
+    /// - texts: 每页一组文字框, 用来铺不可见文字层; nil 或某页缺席就只有图
+    ///
+    /// texts 收 `[Any]?` 而不是写死 `[[[String: Any]]]?`: platform channel 那边
+    /// 过来的是 NSArray 套 NSArray 套 NSDictionary, 一次性往三层嵌套的 Swift
+    /// 类型上强转, 中间任何一格不合就整批变 nil —— 结果是文字层悄悄没了,
+    /// 还查不出是哪一页坏的。摊开成一层一层转, 坏的那个框跳过就是了。
+    private static func renderPdf(
+        images: [String], out: String, size: String, margin: CGFloat, maxEdge: Int,
+        texts: [Any]?
+    ) throws {
+        let base: CGSize = size == "letter"
+            ? CGSize(width: 612, height: 792)          // US Letter
+            : CGSize(width: 595.276, height: 841.89)   // A4
         let url = URL(fileURLWithPath: out)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
 
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: a4))
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: base))
         try renderer.writePDF(to: url) { ctx in
-            for path in images {
+            for (i, path) in images.enumerated() {
                 // 一页一个池子: 不放的话所有页的解码位图会攒到整个闭包结束才释放,
                 // 二十页就是几百 MB, 前台 App 到不了那么高就被 jetsam 收走了
                 autoreleasepool {
-                    guard let img = UIImage(contentsOfFile: path) else { return }
-                    // 横拍的图塞进竖 A4 会缩成窄窄一条, 纸张跟着图的方向走
-                    let landscape = img.size.width > img.size.height
-                    let page = landscape ? CGSize(width: a4.height, height: a4.width) : a4
-                    let bounds = CGRect(origin: .zero, size: page)
+                    guard let img = Self.load(path, maxEdge: maxEdge) else { return }
+                    let bounds = CGRect(origin: .zero, size: Self.pageSize(base, size, img.size))
                     ctx.beginPage(withBounds: bounds, pageInfo: [:])
-                    img.draw(in: Self.fit(img.size, into: bounds))
+                    let dst = Self.fit(img.size, into: bounds.insetBy(dx: margin, dy: margin))
+                    img.draw(in: dst)
+                    // 文字层压在图上面: 顺序在 PDF 里只影响绘制先后, 而它是
+                    // 不可见的, 谁在上面都一样 —— 但阅读器提取文字时是按内容流
+                    // 的顺序走的, 放在后面才跟"先看图再读字"的直觉一致
+                    if let all = texts, i < all.count,
+                       let boxes = all[i] as? [[String: Any]], !boxes.isEmpty {
+                        Self.drawTextLayer(boxes, in: dst, page: bounds.size, ctx.cgContext)
+                    }
                 }
             }
         }
+    }
+
+    /// 往页面上铺一层看不见但选得中、搜得到的文字
+    ///
+    /// 每个框画一行, 横向拉伸到跟框一样宽 —— 识别给的是这一行字在纸上的位置,
+    /// 而系统字体的字宽跟原件里那套字体对不上。不拉伸的话, 选中一行时高亮框
+    /// 会比字短一截或者拖出去一大截, 复制出来的内容倒是对的, 但看着像坏了。
+    ///
+    /// 走 CoreText 而不是 `NSAttributedString.draw`: 要的是 PDF 里那个
+    /// "写了但不显示"的渲染模式(Tr 3), UIKit 那层没有口子设它。
+    private static func drawTextLayer(
+        _ boxes: [[String: Any]], in dst: CGRect, page: CGSize, _ c: CGContext
+    ) {
+        guard !boxes.isEmpty, dst.width > 0, dst.height > 0 else { return }
+        c.saveGState()
+        // PDF 上下文是 y 往下的, CoreText 按 y 往上摆字。整个坐标系翻一次, 比
+        // 给每一行单独配一个翻转的 text matrix 干净, 也不会把字写成镜像 ——
+        // 镜像的字肉眼看不见(它本来就不显示), 但复制出来的位置全是错的
+        c.translateBy(x: 0, y: page.height)
+        c.scaleBy(x: 1, y: -1)
+        c.setTextDrawingMode(.invisible)
+        // 翻转之后图所占的那块; 归一化坐标都相对它算
+        let box = CGRect(x: dst.minX, y: page.height - dst.maxY,
+                         width: dst.width, height: dst.height)
+
+        for b in boxes {
+            guard let t = b["t"] as? String, !t.isEmpty,
+                  let x0 = b["x0"] as? Double, let y0 = b["y0"] as? Double,
+                  let x1 = b["x1"] as? Double, let y1 = b["y1"] as? Double
+            else { continue }
+            let w = CGFloat(x1 - x0) * box.width
+            let h = CGFloat(y1 - y0) * box.height
+            // 小于半个点的框画了也选不中, 白白撑大文件
+            guard w > 0.5, h > 0.5 else { continue }
+
+            // 归一化的 y 是从纸的上边往下量的, 翻转后要倒过来
+            let x = box.minX + CGFloat(x0) * box.width
+            let y = box.minY + CGFloat(1 - y1) * box.height
+
+            // 系统字体, 中文靠 CoreText 自己回退到苹方 —— 用到的字会以子集
+            // 形式嵌进 PDF, 换台机器打开也搜得到
+            let font = UIFont.systemFont(ofSize: max(1, h * 0.8))
+            // 只设渲染模式, 不去动前景色。"画透明色"看着也能藏住字, 但那是让
+            // 绘制系统去画一个全透明的东西, 它有理由整个跳过, 跳过就等于没有
+            // 文字层 —— 而 Tr 3 是 PDF 规范里专门为这件事留的口子
+            let line = CTLineCreateWithAttributedString(
+                NSAttributedString(string: t, attributes: [.font: font]))
+            var ascent: CGFloat = 0, descent: CGFloat = 0
+            let lw = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, nil))
+            guard lw > 0 else { continue }
+            // 拉伸倍数封在 [0.1, 10]: 识别偶尔会给出一个又扁又长的噪声框,
+            // 照着它拉出去的字会横跨整页, 把别处的选中范围搅乱
+            c.textMatrix = CGAffineTransform(scaleX: min(max(w / lw, 0.1), 10), y: 1)
+            // 基线摆在框里居中的位置
+            c.textPosition = CGPoint(x: x, y: y + (h - ascent - descent) / 2 + descent)
+            CTLineDraw(line, c)
+        }
+        c.restoreGState()
+    }
+
+    /// 这一页用多大的纸
+    private static func pageSize(_ base: CGSize, _ kind: String, _ img: CGSize) -> CGSize {
+        // 贴合原图: 纸张照图的长宽比裁, 图正好铺满(页边距设了才留白)。小票和
+        // 证件按 A4 出来是一张纸中间一小块, 这个模式就是为它们准备的。
+        //
+        // 长边仍按 A4/Letter 的长边定 —— 直接拿像素当点的话, 一张 4000 像素的
+        // 扫描图会出一张 141 cm 长的纸, 打印机和阅读器都会当它是海报
+        if kind == "fit", img.width > 0, img.height > 0 {
+            let k = max(base.width, base.height) / max(img.width, img.height)
+            return CGSize(width: img.width * k, height: img.height * k)
+        }
+        // 横拍的图塞进竖版会缩成窄窄一条, 纸张跟着图的方向走
+        return img.width > img.height
+            ? CGSize(width: base.height, height: base.width)
+            : base
+    }
+
+    /// 读一页图, 需要的话顺便压到长边 maxEdge
+    ///
+    /// 压缩走 CGImageSource 的缩略图口子而不是"先整张解码再重画": 它是从原图
+    /// 数据直接解出目标尺寸的, 一张 4000×3000 的图省掉的是 48 MB 的中间位图。
+    /// 二十页连着来的时候, 这个差别就是能不能活着走完
+    private static func load(_ path: String, maxEdge: Int) -> UIImage? {
+        guard maxEdge > 0 else { return UIImage(contentsOfFile: path) }
+        let url = URL(fileURLWithPath: path) as CFURL
+        guard let src = CGImageSourceCreateWithURL(url, [kCGImageSourceShouldCache: false] as CFDictionary)
+        else { return UIImage(contentsOfFile: path) }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxEdge,
+            // 让它顺手把 EXIF 方向应用掉 —— 出来的 CGImage 已经是正的,
+            // 后面 UIImage(cgImage:) 按 .up 用就对了
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
+        else { return UIImage(contentsOfFile: path) }
+        return UIImage(cgImage: cg)
     }
 
     // MARK: - 导入 PDF

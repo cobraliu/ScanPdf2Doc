@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 126796527;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 111713429;
 
 // Section: executor
 
@@ -45,6 +45,49 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__crate__api__convert__convert_for_test_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "convert_for_test",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_model_dir = <String>::sse_decode(&mut deserializer);
+            let api_images = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_out_dir = <String>::sse_decode(&mut deserializer);
+            let api_title = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::convert::convert_for_test(
+                            &api_model_dir,
+                            &api_images,
+                            &api_out_dir,
+                            &api_title,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__convert__convert_images_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -99,6 +142,54 @@ fn wire__crate__api__convert__convert_images_impl(
         },
     )
 }
+fn wire__crate__api__textlayer__ocr_images_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ocr_images",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_model_dir = <String>::sse_decode(&mut deserializer);
+            let api_images = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_long_edge = <u32>::sse_decode(&mut deserializer);
+            let api_low_memory = <bool>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                crate::api::textlayer::OcrProgress,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::textlayer::ocr_images(
+                            api_model_dir,
+                            api_images,
+                            api_long_edge,
+                            api_low_memory,
+                            api_sink,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -107,6 +198,16 @@ impl SseDecode for flutter_rust_bridge::for_generated::anyhow::Error {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <String>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::anyhow::anyhow!("{}", inner);
+    }
+}
+
+impl SseDecode
+    for StreamSink<crate::api::textlayer::OcrProgress, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
     }
 }
 
@@ -153,6 +254,13 @@ impl SseDecode for crate::api::convert::ConvertReport {
     }
 }
 
+impl SseDecode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f32::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -172,6 +280,18 @@ impl SseDecode for Vec<String> {
     }
 }
 
+impl SseDecode for Vec<crate::api::textlayer::PageText> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::textlayer::PageText>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -181,6 +301,46 @@ impl SseDecode for Vec<u8> {
             ans_.push(<u8>::sse_decode(deserializer));
         }
         return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::textlayer::TextBox> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::textlayer::TextBox>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for crate::api::textlayer::OcrProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::textlayer::OcrProgress::Loading;
+            }
+            1 => {
+                let mut var_index = <u32>::sse_decode(deserializer);
+                let mut var_total = <u32>::sse_decode(deserializer);
+                return crate::api::textlayer::OcrProgress::Page {
+                    index: var_index,
+                    total: var_total,
+                };
+            }
+            2 => {
+                let mut var_pages =
+                    <Vec<crate::api::textlayer::PageText>>::sse_decode(deserializer);
+                return crate::api::textlayer::OcrProgress::Done { pages: var_pages };
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -204,6 +364,18 @@ impl SseDecode for crate::api::convert::OutFormat {
             1 => crate::api::convert::OutFormat::Xlsx,
             2 => crate::api::convert::OutFormat::Both,
             _ => unreachable!("Invalid variant for OutFormat: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::textlayer::PageText {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_boxes = <Vec<crate::api::textlayer::TextBox>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::textlayer::PageText {
+            boxes: var_boxes,
+            error: var_error,
         };
     }
 }
@@ -238,6 +410,24 @@ impl SseDecode for crate::api::convert::Progress {
     }
 }
 
+impl SseDecode for crate::api::textlayer::TextBox {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_text = <String>::sse_decode(deserializer);
+        let mut var_x0 = <f32>::sse_decode(deserializer);
+        let mut var_y0 = <f32>::sse_decode(deserializer);
+        let mut var_x1 = <f32>::sse_decode(deserializer);
+        let mut var_y1 = <f32>::sse_decode(deserializer);
+        return crate::api::textlayer::TextBox {
+            text: var_text,
+            x0: var_x0,
+            y0: var_y0,
+            x1: var_x1,
+            y1: var_y1,
+        };
+    }
+}
+
 impl SseDecode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -266,7 +456,9 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__convert__convert_images_impl(port, ptr, rust_vec_len, data_len),
+        1 => wire__crate__api__convert__convert_for_test_impl(port, ptr, rust_vec_len, data_len),
+        2 => wire__crate__api__convert__convert_images_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__textlayer__ocr_images_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -310,6 +502,37 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::convert::ConvertReport>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::textlayer::OcrProgress {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::textlayer::OcrProgress::Loading => [0.into_dart()].into_dart(),
+            crate::api::textlayer::OcrProgress::Page { index, total } => [
+                1.into_dart(),
+                index.into_into_dart().into_dart(),
+                total.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::textlayer::OcrProgress::Done { pages } => {
+                [2.into_dart(), pages.into_into_dart().into_dart()].into_dart()
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::textlayer::OcrProgress
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::textlayer::OcrProgress>
+    for crate::api::textlayer::OcrProgress
+{
+    fn into_into_dart(self) -> crate::api::textlayer::OcrProgress {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::convert::OutFormat {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -328,6 +551,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::convert::OutFormat>
     for crate::api::convert::OutFormat
 {
     fn into_into_dart(self) -> crate::api::convert::OutFormat {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::textlayer::PageText {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.boxes.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::textlayer::PageText
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::textlayer::PageText>
+    for crate::api::textlayer::PageText
+{
+    fn into_into_dart(self) -> crate::api::textlayer::PageText {
         self
     }
 }
@@ -360,11 +604,44 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::convert::Progress>
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::textlayer::TextBox {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.text.into_into_dart().into_dart(),
+            self.x0.into_into_dart().into_dart(),
+            self.y0.into_into_dart().into_dart(),
+            self.x1.into_into_dart().into_dart(),
+            self.y1.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::textlayer::TextBox
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::textlayer::TextBox>
+    for crate::api::textlayer::TextBox
+{
+    fn into_into_dart(self) -> crate::api::textlayer::TextBox {
+        self
+    }
+}
 
 impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(format!("{:?}", self), serializer);
+    }
+}
+
+impl SseEncode
+    for StreamSink<crate::api::textlayer::OcrProgress, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
     }
 }
 
@@ -402,6 +679,13 @@ impl SseEncode for crate::api::convert::ConvertReport {
     }
 }
 
+impl SseEncode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f32::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -419,12 +703,55 @@ impl SseEncode for Vec<String> {
     }
 }
 
+impl SseEncode for Vec<crate::api::textlayer::PageText> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::textlayer::PageText>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <u8>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::textlayer::TextBox> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::textlayer::TextBox>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for crate::api::textlayer::OcrProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::textlayer::OcrProgress::Loading => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::textlayer::OcrProgress::Page { index, total } => {
+                <i32>::sse_encode(1, serializer);
+                <u32>::sse_encode(index, serializer);
+                <u32>::sse_encode(total, serializer);
+            }
+            crate::api::textlayer::OcrProgress::Done { pages } => {
+                <i32>::sse_encode(2, serializer);
+                <Vec<crate::api::textlayer::PageText>>::sse_encode(pages, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
         }
     }
 }
@@ -456,6 +783,14 @@ impl SseEncode for crate::api::convert::OutFormat {
     }
 }
 
+impl SseEncode for crate::api::textlayer::PageText {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::textlayer::TextBox>>::sse_encode(self.boxes, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
 impl SseEncode for crate::api::convert::Progress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -479,6 +814,17 @@ impl SseEncode for crate::api::convert::Progress {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::api::textlayer::TextBox {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.text, serializer);
+        <f32>::sse_encode(self.x0, serializer);
+        <f32>::sse_encode(self.y0, serializer);
+        <f32>::sse_encode(self.x1, serializer);
+        <f32>::sse_encode(self.y1, serializer);
     }
 }
 

@@ -4,25 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../doc.dart' show stamp;
 import '../models.dart';
 import '../rust/api/convert.dart';
-import 'home.dart' show stamp;
 
 /// 识别页: 选格式 -> 跑 Rust -> 出文件
 ///
 /// 整个过程是一条 Stream。Rust 那边每开始一页就 add 一个事件, 最后一个事件
 /// 带着结果 —— 所以这个界面从头到尾只有一个订阅, 不用另外poll状态。
 class ConvertPage extends StatefulWidget {
-  const ConvertPage({super.key, required this.pages});
+  const ConvertPage({super.key, required this.pages, this.title});
 
   final List<String> pages;
+
+  /// 文档名, 默认拿它当标题 —— 用户已经在上一层起过名了, 不该再问一遍
+  final String? title;
 
   @override
   State<ConvertPage> createState() => _ConvertPageState();
 }
 
 class _ConvertPageState extends State<ConvertPage> {
-  final _title = TextEditingController(text: '扫描件-${stamp()}');
+  late final _title =
+      TextEditingController(text: widget.title ?? '扫描件-${stamp()}');
   OutFormat _fmt = OutFormat.docx;
 
   bool _running = false;

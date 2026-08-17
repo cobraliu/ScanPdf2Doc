@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'convert.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `load_gray`, `one_page`, `vacant`
+// These functions are ignored because they are not marked as `pub`: `convert_inner`, `load_gray`, `one_page`, `vacant`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`
 
 /// 把一组页图转成 docx / xlsx
@@ -34,6 +34,22 @@ Stream<Progress> convertImages({
   format: format,
   longEdge: longEdge,
   lowMemory: lowMemory,
+);
+
+/// 给 examples / 集成测试用的直通口子: 按手机上那套默认参数跑一遍, 出 docx
+///
+/// 单独开一个而不是把 convert_inner 设成 pub, 是因为 convert_inner 的八个
+/// 参数里有一半在验证时永远是同一个值, 每次都抄一遍容易抄错。
+Future<ConvertReport> convertForTest({
+  required String modelDir,
+  required List<String> images,
+  required String outDir,
+  required String title,
+}) => RustLib.instance.api.crateApiConvertConvertForTest(
+  modelDir: modelDir,
+  images: images,
+  outDir: outDir,
+  title: title,
 );
 
 /// 一次转换的结果
