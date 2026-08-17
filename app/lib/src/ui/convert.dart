@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../doc.dart' show stamp;
 import '../models.dart';
 import '../rust/api/convert.dart';
+import 'theme.dart';
 
 /// 识别页: 选格式 -> 跑 Rust -> 出文件
 ///
@@ -108,8 +109,9 @@ class _ConvertPageState extends State<ConvertPage> {
         // 不如老老实实等着
         automaticallyImplyLeading: !_running,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Readable(
+          child: ListView(
+        padding: const EdgeInsets.all(Ui.gapMd),
         children: [
           Text('${widget.pages.length} 页',
               style: Theme.of(context).textTheme.titleMedium),
@@ -160,7 +162,7 @@ class _ConvertPageState extends State<ConvertPage> {
             _result(_done!),
           ],
         ],
-      ),
+      )),
     );
   }
 

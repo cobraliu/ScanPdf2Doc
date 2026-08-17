@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../settings.dart';
+import 'theme.dart';
 
 /// 导出 PDF 前问一下用什么纸张、留多少边、压不压图
 ///
@@ -13,6 +14,8 @@ Future<PdfOpts?> askPdfOpts(BuildContext context) async {
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    // iPad 上不限宽的话, 三组按钮会被拉到 1180 点宽, 每一组之间空出一大片
+    constraints: const BoxConstraints(maxWidth: Ui.readable),
     builder: (_) => _Sheet(init: init),
   );
   if (v != null) await Settings.setPdf(v);
@@ -93,9 +96,12 @@ class _SheetState extends State<_Sheet> {
                 style: t.bodySmall,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: Ui.gapSm),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).pop(_v),
+              style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 52),
+                  textStyle: t.titleMedium),
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: const Text('导出'),
             ),
@@ -120,6 +126,9 @@ class _SheetState extends State<_Sheet> {
           width: double.infinity,
           child: SegmentedButton<T>(
             showSelectedIcon: false,
+            // M3 默认给的是 40 点高, 差着苹果那条 44 的线。三组按钮竖着排,
+            // 手指要在它们之间来回点, 差这 4 点很容易点到隔壁那一组
+            style: SegmentedButton.styleFrom(minimumSize: const Size(0, Ui.tap)),
             segments: [
               for (final e in opts.entries)
                 ButtonSegment(value: e.key, label: Text(e.value)),

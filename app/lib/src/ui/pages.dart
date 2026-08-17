@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,6 +13,7 @@ import '../rust/api/textlayer.dart';
 import 'convert.dart';
 import 'edit.dart';
 import 'export_sheet.dart';
+import 'theme.dart';
 
 /// 一个文档里的那一摞页
 ///
@@ -117,8 +119,11 @@ class _DocPageState extends State<DocPage> {
       _progress('正在生成 PDF…');
       final out = await _outPath('pdf');
       await Native.makePdf(paths, out, opts: opts, texts: texts);
-      _say('已导出 PDF · ${opts.summary}');
+      await HapticFeedback.lightImpact();
+      // 先弹分享面板再提示。反过来的话, SnackBar 刚冒头就被面板盖住 ——
+      // 等于没提示。面板关掉之后这句话才有人看得见
       await SharePlus.instance.share(ShareParams(files: [XFile(out)]));
+      _say('已导出到「文件」→ ScanPdf2Doc → out · ${opts.summary}');
     });
   }
 
@@ -227,7 +232,15 @@ class _DocPageState extends State<DocPage> {
       ),
       body: Stack(
         children: [
-          n == 0 ? const _Empty() : _list(),
+          n == 0
+              ? EmptyHint(
+                  icon: Icons.document_scanner_outlined,
+                  title: '还没有页',
+                  hint: '「扫描」拍纸质件，\n「相册」「PDF」导入已有文件',
+                  actionLabel: '开始扫描',
+                  onAction: _busy ? null : _scan,
+                )
+              : _list(),
           if (_busy)
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -284,64 +297,148 @@ class _DocPageState extends State<DocPage> {
   }
 
   Widget _list() {
-    return ReorderableListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _doc.count,
-      // onReorderItem 而不是老的 onReorder: 后者给的 newIndex 是"还没把元素
-      // 拿走时"的下标, 往后拖要自己减一, 一直是这个控件最容易写错的地方。
-      // 新回调已经替我们调好了, 直接用
-      onReorderItem: (a, b) async {
-        await _doc.reorder(a, b);
-        if (mounted) setState(() {});
-      },
-      itemBuilder: (ctx, i) => _tile(i),
+    return Readable(
+      child: ReorderableListView.builder(
+        padding: const EdgeInsets.only(top: Ui.gapSm, bottom: Ui.gapLg),
+        itemCount: _doc.count,
+        // onReorderItem 而不是老的 onReorder: 后者给的 newIndex 是"还没把元素
+        // 拿走时"的下标, 往后拖要自己减一, 一直是这个控件最容易写错的地方。
+        // 新回调已经替我们调好了, 直接用
+        onReorderItem: (a, b) async {
+          await HapticFeedback.selectionClick();
+          await _doc.reorder(a, b);
+          if (mounted) setState(() {});
+        },
+        itemBuilder: (ctx, i) => _tile(i),
+      ),
     );
   }
 
+  /// 把第 i 页挪到 to
+  ///
+  /// 拖拽之外的第二条路。只能拖的话, 手不稳的人、开着旁白的人就没有办法排序
+  /// 了 —— 而"每个拖拽都要有非拖拽的替代"是条硬规矩(WCAG 2.2 的
+  /// dragging-alternative)。菜单里的「上移/下移」就是那条替代路。
+  Future<void> _movePage(int i, int to) async {
+    if (to < 0 || to >= _doc.count) return;
+    await HapticFeedback.selectionClick();
+    await _doc.reorder(i, to);
+    if (mounted) setState(() {});
+  }
+
+  /// 删一页要先问一句
+  ///
+  /// 以前这里是点一下直接删。页图删掉就没了(连带那张留着做「还原」的原图),
+  /// 而删除按钮就贴在拖拽手柄边上 —— 想拖着换个顺序, 手指偏一点就少一页,
+  /// 而且没有任何提示。
+  Future<void> _removePage(int i) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('删掉第 ${i + 1} 页？'),
+        content: const Text('这一页会从文档里移除，恢复不了。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await HapticFeedback.mediumImpact();
+    await _doc.removePage(i);
+    if (mounted) setState(() {});
+  }
+
   Widget _tile(int i) {
+    final t = Theme.of(context);
     return ListTile(
       // 页文件名不会重复(见 Doc.nextSeq), 拿它当 key 和图片缓存键都是稳的
       key: ValueKey(_doc.pages[i]),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        // cacheWidth 是必须的: 不给的话每张缩略图都会把整张四千像素的照片解成
-        // 位图放进内存, 二十页就是几百 MB —— 识别还没开始就先把内存吃光了
-        child: Image.file(
-          File(_doc.pagePath(i)),
-          width: 56,
-          height: 74,
-          fit: BoxFit.cover,
-          cacheWidth: 160,
-          errorBuilder: (_, _, _) => const SizedBox(
-            width: 56,
-            height: 74,
-            child: Icon(Icons.broken_image_outlined),
-          ),
-        ),
-      ),
+      leading: PageThumb(path: _doc.pagePath(i)),
       // 不再显示文件名: 以前那是相机/相册给的名字, 还有点信息量; 现在页图
       // 是我们自己按页号命名的, 写出来就是一句废话
       title: Text('第 ${i + 1} 页'),
       subtitle: _doc.hasOriginal(i)
-          ? Text('已编辑', style: Theme.of(context).textTheme.bodySmall)
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_fix_high_outlined,
+                    size: 14, color: t.colorScheme.onSurfaceVariant),
+                const SizedBox(width: Ui.gapXs),
+                Text('已编辑',
+                    style: t.textTheme.bodySmall
+                        ?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+              ],
+            )
           : null,
       onTap: _busy ? null : () => _edit(i),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () async {
-              await _doc.removePage(i);
-              if (mounted) setState(() {});
+          // 删除从"直接一个按钮"收进菜单。它原先就贴着拖拽手柄, 两个 40 点
+          // 出头的命中区并排, 想拖着换顺序结果删掉一页是很容易发生的事
+          PopupMenuButton<String>(
+            tooltip: '这一页的操作',
+            enabled: !_busy,
+            onSelected: (v) {
+              switch (v) {
+                case 'up':
+                  _movePage(i, i - 1);
+                case 'down':
+                  _movePage(i, i + 1);
+                case 'delete':
+                  _removePage(i);
+              }
             },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'up',
+                enabled: i > 0,
+                child: const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.arrow_upward),
+                  title: Text('上移'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'down',
+                enabled: i < _doc.count - 1,
+                child: const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.arrow_downward),
+                  title: Text('下移'),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading:
+                      Icon(Icons.delete_outline, color: t.colorScheme.error),
+                  title: Text('删除',
+                      style: TextStyle(color: t.colorScheme.error)),
+                ),
+              ),
+            ],
           ),
+          // 手柄的命中区撑到 44×44: 原先是 24 的图标加 8 的内边距 = 40
           ReorderableDragStartListener(
             index: i,
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.drag_handle),
+            child: Tooltip(
+              message: '按住拖动排序',
+              child: SizedBox(
+                width: Ui.tap,
+                height: Ui.tap,
+                child: Icon(Icons.drag_handle, color: t.colorScheme.outline),
+              ),
             ),
           ),
         ],
@@ -416,23 +513,3 @@ class _Act extends StatelessWidget {
   }
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 12,
-        children: [
-          Icon(Icons.document_scanner_outlined,
-              size: 72, color: Theme.of(context).colorScheme.outline),
-          const Text('还没有页'),
-          Text('「扫描」拍纸质件，「相册」「PDF」导入已有文件',
-              style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
-    );
-  }
-}

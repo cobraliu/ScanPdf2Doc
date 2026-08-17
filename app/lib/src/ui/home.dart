@@ -1,9 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../doc.dart';
 import 'pages.dart';
+import 'theme.dart';
 
 /// 文档列表 —— App 的首页
 ///
@@ -21,11 +21,18 @@ class _HomePageState extends State<HomePage> {
   List<Doc>? _docs;
   String _q = '';
   bool _searching = false;
+  final _search = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -82,8 +89,16 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     if (ok != true) return;
+    // 删掉之后列表会少一行, 手上给一下回馈 —— 破坏性操作只有视觉变化的话,
+    // 用户会不确定"我刚才那一下到底点中没有"
+    await HapticFeedback.mediumImpact();
     await d.destroy();
     await _reload();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('已删除「${d.name}」')));
+    }
   }
 
   @override
@@ -92,10 +107,24 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: _searching
             ? TextField(
+                controller: _search,
                 autofocus: true,
-                decoration: const InputDecoration(
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
                   hintText: '搜文档名',
                   border: InputBorder.none,
+                  // 清空和退出搜索是两件事: 以前只有一个 X, 想重打一个词
+                  // 就得先退出搜索再点开
+                  suffixIcon: _q.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.cancel, size: 20),
+                          tooltip: '清空',
+                          onPressed: () {
+                            _search.clear();
+                            setState(() => _q = '');
+                          },
+                        ),
                 ),
                 onChanged: (v) => setState(() => _q = v),
               )
@@ -103,9 +132,11 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search),
+            tooltip: _searching ? '退出搜索' : '搜索',
             onPressed: () => setState(() {
               _searching = !_searching;
               _q = '';
+              _search.clear();
             }),
           ),
         ],
@@ -123,52 +154,70 @@ class _HomePageState extends State<HomePage> {
     if (_docs == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_docs!.isEmpty) return const _Empty();
+    if (_docs!.isEmpty) {
+      return EmptyHint(
+        icon: Icons.folder_open_outlined,
+        title: '还没有文档',
+        hint: '一个文档就是一摞扫出来的页，\n可以整份导成 PDF 或者 Word',
+        actionLabel: '新建文档',
+        onAction: _create,
+      );
+    }
     final xs = _shown;
-    if (xs.isEmpty) return const Center(child: Text('没有匹配的文档'));
-    return RefreshIndicator(
-      onRefresh: _reload,
-      child: ListView.builder(
-        // 底下给 FAB 留出地方, 不然最后一条永远被压着
-        padding: const EdgeInsets.only(top: 8, bottom: 88),
-        itemCount: xs.length,
-        itemBuilder: (ctx, i) => _tile(xs[i]),
+    if (xs.isEmpty) {
+      return EmptyHint(
+        icon: Icons.search_off_outlined,
+        title: '没有匹配的文档',
+        hint: '换个词试试，搜的是文档名',
+      );
+    }
+    return Readable(
+      child: RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView.separated(
+          // 底下给 FAB 留出地方, 不然最后一条永远被它压着
+          padding: const EdgeInsets.only(top: Ui.gapSm, bottom: 96),
+          itemCount: xs.length,
+          // 分隔线在暗色下也要看得见, 所以走主题的 divider 而不是自己配灰度
+          separatorBuilder: (_, _) =>
+              const Divider(height: 1, indent: Ui.gapMd + Ui.thumbW + Ui.gapMd),
+          itemBuilder: (ctx, i) => _tile(xs[i]),
+        ),
       ),
     );
   }
 
   Widget _tile(Doc d) {
+    final t = Theme.of(context);
     return ListTile(
       key: ValueKey(d.id),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: SizedBox(
-          width: 48,
-          height: 62,
-          child: d.cover == null
-              ? Container(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: const Icon(Icons.description_outlined, size: 20),
-                )
-              // cacheWidth 同页列表那边: 不给的话每张封面都会把整张四千像素的
-              // 照片解成位图放进内存
-              : Image.file(
-                  File(d.cover!),
-                  fit: BoxFit.cover,
-                  cacheWidth: 140,
-                  errorBuilder: (_, _, _) =>
-                      const Icon(Icons.broken_image_outlined),
-                ),
-        ),
-      ),
+      leading: PageThumb(path: d.cover),
       title: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text('${d.count} 页 · ${_when(d.updated)}'),
+      subtitle: Text(
+        '${d.count} 页 · ${_when(d.updated)}',
+        style: t.textTheme.bodySmall
+            ?.copyWith(color: t.colorScheme.onSurfaceVariant),
+      ),
       trailing: PopupMenuButton<String>(
+        tooltip: '更多',
         onSelected: (v) => v == 'rename' ? _rename(d) : _delete(d),
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'rename', child: Text('重命名')),
-          PopupMenuItem(value: 'delete', child: Text('删除')),
+        itemBuilder: (_) => [
+          const PopupMenuItem(
+            value: 'rename',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.drive_file_rename_outline),
+              title: Text('重命名'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.delete_outline, color: t.colorScheme.error),
+              title: Text('删除', style: TextStyle(color: t.colorScheme.error)),
+            ),
+          ),
         ],
       ),
       onTap: () => _open(d),
@@ -184,26 +233,5 @@ class _HomePageState extends State<HomePage> {
     if (d.inDays < 30) return '${d.inDays} 天前';
     String p(int v) => v.toString().padLeft(2, '0');
     return '${t.year}-${p(t.month)}-${p(t.day)}';
-  }
-}
-
-class _Empty extends StatelessWidget {
-  const _Empty();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 12,
-        children: [
-          Icon(Icons.folder_open_outlined,
-              size: 72, color: Theme.of(context).colorScheme.outline),
-          const Text('还没有文档'),
-          Text('点右下角「新建」开始扫描',
-              style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
-    );
   }
 }

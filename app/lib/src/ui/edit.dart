@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../doc.dart';
 import '../native.dart';
+import 'theme.dart';
 
 /// 单页编辑: 转 90° / 拖四个角重裁 / 退回原图
 ///
@@ -80,9 +82,11 @@ class _EditPageState extends State<EditPage> {
     }
   }
 
-  Future<void> _rotate() => _guard(() async {
+  /// turns: 顺时针转几个 90°。1 = 右转, 3 = 左转
+  Future<void> _rotate(int turns) => _guard(() async {
         final src = _doc.pagePath(_i);
-        await _doc.replacePage(_i, (out) => Native.rotatePage(src, out, 1));
+        await HapticFeedback.selectionClick();
+        await _doc.replacePage(_i, (out) => Native.rotatePage(src, out, turns));
         await _measure();
         if (mounted) setState(() {});
       });
@@ -109,25 +113,40 @@ class _EditPageState extends State<EditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text('第 ${_i + 1} 页'),
-        actions: [
-          if (_doc.hasOriginal(_i) && !_cropping)
-            TextButton(
-              onPressed: _busy ? null : _restore,
-              child: const Text('还原'),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_busy) const LinearProgressIndicator(minHeight: 3),
-          Expanded(child: _canvas()),
-          _bar(),
-        ],
-      ),
+    // 整页强制暗色: 判断一张扫描件裁得正不正, 要看的是纸的边缘在哪, 周围
+    // 一圈亮色会把眼睛往外拽 —— 系统相册、相机的编辑界面都是黑底, 是同一个
+    // 道理。但工具栏和按钮得跟着变, 否则亮色主题的白 AppBar 压在黑画布上,
+    // 分割线和图标的对比度全乱
+    return Theme(
+      data: Ui.dark(),
+      child: Builder(builder: (ctx) {
+        final t = Theme.of(ctx);
+        return Scaffold(
+          backgroundColor: t.colorScheme.surfaceContainerLowest,
+          appBar: AppBar(
+            title: Text('第 ${_i + 1} 页'),
+            actions: [
+              if (_doc.hasOriginal(_i) && !_cropping)
+                TextButton.icon(
+                  onPressed: _busy ? null : _restore,
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: const Text('还原'),
+                ),
+            ],
+          ),
+          body: Column(
+            children: [
+              // 高度固定占着, 不然进度条一出一进整个画布会跳 3 点
+              SizedBox(
+                height: 3,
+                child: _busy ? const LinearProgressIndicator(minHeight: 3) : null,
+              ),
+              Expanded(child: _canvas()),
+              _bar(),
+            ],
+          ),
+        );
+      }),
     );
   }
 
@@ -244,13 +263,22 @@ class _EditPageState extends State<EditPage> {
                 ],
               )
             : Row(
-                spacing: 8,
+                spacing: Ui.gapSm,
                 children: [
+                  // 补一个左转。以前只有右转, 拍反了的一页要连点三下, 每一下
+                  // 都是一次读图-转-写盘, 三次就是三秒多
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _busy ? null : _rotate,
+                      onPressed: _busy ? null : () => _rotate(3),
+                      icon: const Icon(Icons.rotate_90_degrees_ccw_outlined),
+                      label: const Text('左转'),
+                    ),
+                  ),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : () => _rotate(1),
                       icon: const Icon(Icons.rotate_90_degrees_cw_outlined),
-                      label: const Text('旋转'),
+                      label: const Text('右转'),
                     ),
                   ),
                   Expanded(
