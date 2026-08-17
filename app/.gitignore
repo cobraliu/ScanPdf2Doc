@@ -57,3 +57,8 @@ app.*.map.json
 
 # cargokit / rust
 /rust/target/
+
+# gen-l10n 的产物。pubspec 里开了 generate: true, 每次 build 都会照着
+# lib/l10n/*.arb 重新生成一遍 —— 提交进来只会在每个人的 diff 里打架
+lib/l10n/l10n.dart
+lib/l10n/l10n_*.dart

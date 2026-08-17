@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Locale;
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:path_provider/path_provider.dart';
+
+import '../l10n/l10n.dart';
 
 /// 出 PDF 时的三个选项
 ///
@@ -58,27 +62,29 @@ class PdfOpts {
         searchable: m['searchable'] as bool? ?? false,
       );
 
-  String get sizeLabel => switch (size) {
+  // 三个挡位的名字要收 L 而不是当 getter: 它们最后会拼进导出成功那句提示,
+  // 而那句是给用户看的 —— 界面切到日文之后还回一句"A4 · 无边距"就露馅了
+  String sizeLabel(L l) => switch (size) {
         'letter' => 'Letter',
-        'fit' => '贴合原图',
+        'fit' => l.exportSizeFit,
         _ => 'A4',
       };
 
-  String get marginLabel => switch (margin) {
-        0 => '无边距',
-        <= 24 => '窄边距',
-        _ => '常规边距',
+  String marginLabel(L l) => switch (margin) {
+        0 => l.exportMarginNoneLabel,
+        <= 24 => l.exportMarginNarrowLabel,
+        _ => l.exportMarginNormalLabel,
       };
 
-  String get qualityLabel => switch (maxEdge) {
-        0 => '原图画质',
-        <= 1600 => '省空间',
-        _ => '高画质',
+  String qualityLabel(L l) => switch (maxEdge) {
+        0 => l.exportQualityOriginalLabel,
+        <= 1600 => l.exportQualitySmallLabel,
+        _ => l.exportQualityHighLabel,
       };
 
   /// 一行摘要, 导完给用户回一句"刚才出的是什么"
-  String get summary =>
-      '$sizeLabel · $marginLabel · $qualityLabel${searchable ? ' · 可搜索' : ''}';
+  String summary(L l) => '${sizeLabel(l)} · ${marginLabel(l)} · ${qualityLabel(l)}'
+      '${searchable ? ' · ${l.exportSearchableTag}' : ''}';
 }
 
 /// 全局设置, 存在 Application Support/settings.json
@@ -86,36 +92,78 @@ class PdfOpts {
 /// 读一次就缓存在内存里: 每次导出都去碰一次磁盘没必要, 而且这个文件只有本
 /// App 会写。
 class Settings {
-  static PdfOpts? _pdf;
+  static PdfOpts _pdf = const PdfOpts();
+
+  /// 用户挑的界面语言; null = 跟随系统
+  ///
+  /// 用 ValueNotifier 而不是让首页 setState: 改语言要让整个 MaterialApp 重建,
+  /// 而 MaterialApp 在首页的上面 —— 首页 setState 到不了它。
+  static final locale = ValueNotifier<Locale?>(null);
 
   static Future<File> _file() async {
     final base = await getApplicationSupportDirectory();
     return File('${base.path}/settings.json');
   }
 
-  static Future<PdfOpts> pdf() async {
-    if (_pdf != null) return _pdf!;
+  /// 开机读一次。放在 runApp 前 —— 晚一步的话第一帧会拿系统语言画出来,
+  /// 然后当着用户的面闪一下换成他选的那种
+  static Future<void> load() async {
     try {
       final f = await _file();
-      if (await f.exists()) {
-        final m = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-        _pdf = PdfOpts.fromJson((m['pdf'] as Map).cast<String, dynamic>());
-      }
+      if (!await f.exists()) return;
+      final m = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      final p = m['pdf'];
+      if (p is Map) _pdf = PdfOpts.fromJson(p.cast<String, dynamic>());
+      final t = m['locale'];
+      if (t is String && t.isNotEmpty) locale.value = _parse(t);
     } catch (_) {
       // 文件坏了就当没设置过 —— 一个读不出来的配置不该让人导不了 PDF
     }
-    return _pdf ??= const PdfOpts();
   }
+
+  static Future<PdfOpts> pdf() async => _pdf;
 
   static Future<void> setPdf(PdfOpts v) async {
     _pdf = v;
+    await _save();
+  }
+
+  /// null = 跟随系统
+  static Future<void> setLocale(Locale? v) async {
+    locale.value = v;
+    await _save();
+  }
+
+  static Future<void> _save() async {
     try {
       final f = await _file();
       final t = File('${f.path}.tmp');
-      await t.writeAsString(jsonEncode({'pdf': v.toJson()}), flush: true);
+      await t.writeAsString(
+          jsonEncode({
+            'pdf': _pdf.toJson(),
+            'locale': _tag(locale.value),
+          }),
+          flush: true);
       await t.rename(f.path);
     } catch (_) {
       // 存不下就只在这次运行里生效, 不值得打断导出
     }
+  }
+
+  /// 存成 BCP 47 那一套(`zh-Hant`), 不是 Dart 的 `toString()`(`zh_Hant`)
+  static String _tag(Locale? l) => l == null
+      ? ''
+      : [l.languageCode, ?l.scriptCode, ?l.countryCode].join('-');
+
+  static Locale? _parse(String s) {
+    final p = s.split(RegExp('[-_]'));
+    if (p.isEmpty || p.first.isEmpty) return null;
+    return Locale.fromSubtags(
+      languageCode: p.first,
+      // 脚本码是四位且首字母大写(Hant/Hans), 地区码是两位全大写 —— 靠长度
+      // 就能分开, 不用再引一个 BCP 47 的解析库
+      scriptCode: p.length > 1 && p[1].length == 4 ? p[1] : null,
+      countryCode: p.length > 1 && p.last.length == 2 ? p.last : null,
+    );
   }
 }

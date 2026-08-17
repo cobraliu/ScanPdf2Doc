@@ -244,7 +244,9 @@ class DocStore {
     final now = DateTime.now();
     final d = Doc(
       id: id,
-      name: name ?? '扫描件-$id',
+      // 兜底就是 id(一串时间戳), 不带任何一种语言的词。这一层拿不到 L,
+      // 而两个调用点都是传好名字进来的 —— 这条路实际走不到
+      name: name ?? id,
       created: now,
       updated: now,
       pages: [],

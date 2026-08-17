@@ -1,0 +1,11 @@
+# 多语言配置, `flutter gen-l10n` 和 build 前的自动生成都读这份
+#
+# 模板用英文: ICU 的复数规则(one/other)在英文里写出来最不容易错, 而中文没有
+# 复数、日韩也没有 —— 拿中文当模板的话, 那几条规则等于在没有复数的语言里
+# 凭空设计, 翻到英文时才发现漏了单数形。
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: l10n.dart
+output-class: L
+# 生成的 L.of(context) 返回非空。App 一定装了 delegate, 每次都写 `!` 是噪音
+nullable-getter: false

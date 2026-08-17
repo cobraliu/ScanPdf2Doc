@@ -6,8 +6,23 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- 这里写的是兜底名字, 真正显示的在各 *.lproj/InfoPlist.strings 里。
+	     兜底放英文而不是中文: 走到这一步说明系统语言七种都不沾边, 那时候
+	     一串汉字比一个英文词更没用 -->
 	<key>CFBundleDisplayName</key>
-	<string>扫描转文档</string>
+	<string>Scan2Doc</string>
+	<!-- 声明支持哪些语言。App Store 的语言列表读的是这个, 系统挑
+	     InfoPlist.strings 走的也是这个 -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
+		<string>es</string>
+		<string>de</string>
+		<string>ja</string>
+		<string>ko</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

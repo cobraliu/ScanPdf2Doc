@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../doc.dart' show stamp;
 import '../models.dart';
 import '../rust/api/textlayer.dart';
+import 'errors.dart';
 import 'theme.dart';
+
+/// 跑到哪一步了。存这个而不是存拼好的那句话 —— 那句要在 build 里翻
+enum _Stage { prep, loading, page }
 
 /// 提取文字: 把每一页认出来的字摊开, 能看、能选、能复制、能导成 txt
 ///
@@ -30,9 +35,10 @@ class TextPage extends StatefulWidget {
 
 class _TextPageState extends State<TextPage> {
   bool _running = false;
-  String _stage = '';
+  _Stage? _stage;
+  int _at = 0, _of = 0;
   double? _frac;
-  String? _error;
+  Object? _error;
 
   /// 每页一段文字, 页序跟传进来的一致; null 表示还没跑
   List<String>? _out;
@@ -51,7 +57,7 @@ class _TextPageState extends State<TextPage> {
       _running = true;
       _error = null;
       _out = null;
-      _stage = '准备中';
+      _stage = _Stage.prep;
       _frac = null;
     });
     try {
@@ -67,12 +73,14 @@ class _TextPageState extends State<TextPage> {
         switch (p) {
           case OcrProgress_Loading():
             setState(() {
-              _stage = '加载模型';
+              _stage = _Stage.loading;
               _frac = null;
             });
           case OcrProgress_Page(:final index, :final total):
             setState(() {
-              _stage = '识别 $index / $total 页';
+              _stage = _Stage.page;
+              _at = index;
+              _of = total;
               _frac = index / total;
             });
           case OcrProgress_Done(:final pages):
@@ -80,43 +88,47 @@ class _TextPageState extends State<TextPage> {
         }
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _running = false);
     }
   }
 
-  String get _all {
+  String _allText(L l) {
     final xs = _out ?? const <String>[];
     if (xs.length == 1) return xs.first;
     // 多页时标上页号。一份合同的文字连成一片之后, "这句在第几页"是最先丢掉
     // 也最常被问起的信息
     return [
       for (final (i, s) in xs.indexed)
-        if (s.trim().isNotEmpty) '【第 ${i + 1} 页】\n$s',
+        if (s.trim().isNotEmpty) '${l.textPageMarker(i + 1)}\n$s',
     ].join('\n\n');
   }
 
   Future<void> _copy(String s, String what) async {
     if (s.trim().isEmpty) return;
+    final l = L.of(context);
     await Clipboard.setData(ClipboardData(text: s));
     await HapticFeedback.lightImpact();
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('已复制$what')));
+      ..showSnackBar(SnackBar(content: Text(l.textCopied(what))));
   }
 
   Future<void> _exportTxt() async {
-    final s = _all;
+    final l = L.of(context);
+    final s = _allText(l);
     if (s.trim().isEmpty) return;
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/out');
     await dir.create(recursive: true);
-    final name = (widget.title ?? '扫描件-${stamp()}')
+    final name = (widget.title ?? l.commonDefaultDocName(stamp()))
         .replaceAll(RegExp(r'[/\\:*?"<>|]'), '_')
         .trim();
-    final f = File('${dir.path}/${name.isEmpty ? '扫描件' : name}.txt');
+    // 兜底用时间戳而不是某种语言的"扫描件": 名字被过滤成空是极少数情况,
+    // 而这时候再翻一次只会让文件名跟着界面语言变, 反倒不好找
+    final f = File('${dir.path}/${name.isEmpty ? stamp() : name}.txt');
     // UTF-8 带 BOM: 不带的话, Windows 记事本和一部分老 Excel 会把中文认成
     // 乱码。多三个字节换掉一整类"打开是天书"的反馈。写成转义而不是直接敲一个
     // U+FEFF —— 那个字符在编辑器里是看不见的, 谁都不知道行首多了个什么
@@ -127,38 +139,40 @@ class _TextPageState extends State<TextPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final done = _out != null;
+    final all = done ? _allText(l) : '';
     return Scaffold(
       appBar: AppBar(
-        title: const Text('提取文字'),
+        title: Text(l.textTitle),
         // 跑的时候不让退: Rust 那侧没有中断的口子, 界面退了它还在后台算
         automaticallyImplyLeading: !_running,
         actions: [
-          if (done && _all.trim().isNotEmpty) ...[
+          if (all.trim().isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.copy_all_outlined),
-              tooltip: '复制全部',
-              onPressed: () => _copy(_all, '全部文字'),
+              tooltip: l.textCopyAll,
+              onPressed: () => _copy(all, l.textAll),
             ),
             IconButton(
               icon: const Icon(Icons.ios_share),
-              tooltip: '导出 txt',
+              tooltip: l.textExportTxt,
               onPressed: _exportTxt,
             ),
           ],
         ],
       ),
-      body: Readable(child: _body()),
+      body: Readable(child: _body(l)),
     );
   }
 
-  Widget _body() {
+  Widget _body(L l) {
     if (_error != null) {
       return EmptyHint(
         icon: Icons.error_outline,
-        title: '没认成',
-        hint: _error!,
-        actionLabel: '再试一次',
+        title: l.textFailedTitle,
+        hint: humanError(l, _error!),
+        actionLabel: l.commonRetry,
         onAction: _run,
       );
     }
@@ -170,9 +184,14 @@ class _TextPageState extends State<TextPage> {
           children: [
             LinearProgressIndicator(value: _frac),
             const SizedBox(height: Ui.gap),
-            Text(_stage),
+            Text(switch (_stage) {
+              _Stage.prep => l.convertPreparing,
+              _Stage.loading => l.convertLoading,
+              _Stage.page => l.convertPageOf(_at, _of),
+              null => '',
+            }),
             const SizedBox(height: Ui.gapSm),
-            Text('第一页要多等一会儿 —— 模型是那时候才真正加载的',
+            Text(l.ocrFirstPageNote,
                 style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
@@ -180,22 +199,21 @@ class _TextPageState extends State<TextPage> {
     }
     final xs = _out!;
     if (xs.every((s) => s.trim().isEmpty)) {
-      return const EmptyHint(
+      return EmptyHint(
         icon: Icons.text_fields_outlined,
-        title: '一个字也没认出来',
-        hint: '如果这几页本来就是照片或者图纸，那是对的；\n'
-            '要是上面确实有字，回去用「增强」把底色摊平再来一次',
+        title: l.textNothingTitle,
+        hint: l.textNothingHint,
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(
           Ui.gapMd, Ui.gapSm, Ui.gapMd, Ui.gapLg),
       itemCount: xs.length,
-      itemBuilder: (ctx, i) => _card(i, xs[i]),
+      itemBuilder: (ctx, i) => _card(l, i, xs[i]),
     );
   }
 
-  Widget _card(int i, String s) {
+  Widget _card(L l, int i, String s) {
     final t = Theme.of(context);
     final empty = s.trim().isEmpty;
     return Card(
@@ -208,20 +226,20 @@ class _TextPageState extends State<TextPage> {
             Row(
               children: [
                 Expanded(
-                  child: Text('第 ${i + 1} 页',
+                  child: Text(l.commonPageN(i + 1),
                       style: t.textTheme.labelLarge
                           ?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                 ),
                 if (!empty)
                   IconButton(
                     icon: const Icon(Icons.copy_outlined, size: 20),
-                    tooltip: '复制这一页',
-                    onPressed: () => _copy(s, '第 ${i + 1} 页'),
+                    tooltip: l.textCopyPage,
+                    onPressed: () => _copy(s, l.commonPageN(i + 1)),
                   ),
               ],
             ),
             if (empty)
-              Text('这一页没认出文字', style: t.textTheme.bodySmall)
+              Text(l.textPageEmpty, style: t.textTheme.bodySmall)
             else
               // SelectableText 而不是 Text: 一整页复制走是一种用法, 只挑
               // 其中一个账号、一个日期出来是另一种, 后者更常见

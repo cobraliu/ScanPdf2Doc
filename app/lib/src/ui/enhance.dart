@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import 'theme.dart';
 
 /// 几种增强方式
@@ -8,18 +9,31 @@ import 'theme.dart';
 /// 两件事: 底色摊没摊平、字够不够黑 —— 剩下的都是这两件事上的刻度。四个之内
 /// 可以横着一排全摆出来, 不用滑, 也不用记哪个是哪个。
 enum Enhance {
-  auto('auto', '自动', Icons.auto_awesome_outlined, '摊平底色、去掉阴影，颜色留着。多数情况选它'),
-  light('light', '增亮', Icons.wb_sunny_outlined, '只提一点亮度，最接近原样'),
-  gray('gray', '灰度', Icons.gradient_outlined, '去掉颜色，印章和照片的层次还在'),
-  bw('bw', '黑白', Icons.contrast, '字最黑纸最白，纯文字件用这个，PDF 也最小');
+  auto('auto', Icons.auto_awesome_outlined),
+  light('light', Icons.wb_sunny_outlined),
+  gray('gray', Icons.gradient_outlined),
+  bw('bw', Icons.contrast);
 
-  const Enhance(this.id, this.label, this.icon, this.hint);
+  const Enhance(this.id, this.icon);
 
-  /// 传给原生那侧的名字
+  /// 传给原生那侧的名字。故意跟界面上那个词分开 —— 界面上是「黑白」还是
+  /// "Schwarzweiß" 跟原生无关, 而这个值是要跨语言稳定的
   final String id;
-  final String label;
   final IconData icon;
-  final String hint;
+
+  String label(L l) => switch (this) {
+        Enhance.auto => l.enhanceAuto,
+        Enhance.light => l.enhanceLight,
+        Enhance.gray => l.enhanceGray,
+        Enhance.bw => l.enhanceBw,
+      };
+
+  String hint(L l) => switch (this) {
+        Enhance.auto => l.enhanceAutoHint,
+        Enhance.light => l.enhanceLightHint,
+        Enhance.gray => l.enhanceGrayHint,
+        Enhance.bw => l.enhanceBwHint,
+      };
 }
 
 /// 问一句整批用哪种增强; 返回 null 表示取消
@@ -34,6 +48,7 @@ Future<Enhance?> askEnhance(BuildContext context, int pages) {
     constraints: const BoxConstraints(maxWidth: Ui.readable),
     builder: (ctx) {
       final t = Theme.of(ctx).textTheme;
+      final l = L.of(ctx);
       return SafeArea(
         child: ListView(
           shrinkWrap: true,
@@ -42,22 +57,19 @@ Future<Enhance?> askEnhance(BuildContext context, int pages) {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   Ui.gapMd, 0, Ui.gapMd, Ui.gapSm),
-              child: Text('增强这 $pages 页', style: t.titleLarge),
+              child: Text(l.enhanceSheetTitle(pages), style: t.titleLarge),
             ),
             for (final e in Enhance.values)
               ListTile(
                 leading: Icon(e.icon),
-                title: Text(e.label),
-                subtitle: Text(e.hint, style: t.bodySmall),
+                title: Text(e.label(l)),
+                subtitle: Text(e.hint(l), style: t.bodySmall),
                 onTap: () => Navigator.of(ctx).pop(e),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   Ui.gapMd, Ui.gapSm, Ui.gapMd, 0),
-              child: Text(
-                '每一页原来的样子都留着，进这一页点「还原」就能退回去',
-                style: t.bodySmall,
-              ),
+              child: Text(l.enhanceSheetNote, style: t.bodySmall),
             ),
           ],
         ),

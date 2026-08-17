@@ -173,8 +173,9 @@ class DocScanner: NSObject {
                 let v = try body()
                 DispatchQueue.main.async { result(v) }
             } catch {
+                let code = (error as? Err)?.code ?? "img"
                 DispatchQueue.main.async {
-                    result(FlutterError(code: "img", message: error.localizedDescription, details: nil))
+                    result(FlutterError(code: code, message: error.localizedDescription, details: nil))
                 }
             }
         }
@@ -316,7 +317,9 @@ class DocScanner: NSObject {
 
         // 一个滤镜都没跑到还照抄一份出去, 是骗人: 那一页会被标成"已编辑"、
         // 「还原」按钮也亮起来, 而画面一点没变。iOS 15 上的 auto 就是这种情况
-        if img === ci { throw Err("这台设备的系统太老，用不了自动增强（要 iOS 16）") }
+        if img === ci {
+            throw Err("这台设备的系统太老, 用不了自动增强(要 iOS 16)", code: "os_too_old")
+        }
         try write(img, to: out)
         return out
     }
@@ -738,7 +741,19 @@ private final class StreamBag {
 /// localizedDescription 会变成 "The operation couldn't be completed"
 private struct Err: LocalizedError {
     let msg: String
-    init(_ msg: String) { self.msg = msg }
+
+    /// 传给 Flutter 那侧的错误码
+    ///
+    /// 这些 msg 是诊断, 一直是中文, 不跟着界面语言走 —— 翻译它们要在 Swift
+    /// 里再搭一套 l10n, 而用户看到它们的概率很低。真正会被正常撞上的那几条
+    /// 另给一个码, Dart 那边按码挑一句本地化的话说。
+    let code: String
+
+    init(_ msg: String, code: String = "img") {
+        self.msg = msg
+        self.code = code
+    }
+
     var errorDescription: String? { msg }
 }
 

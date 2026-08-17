@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../doc.dart';
 import '../models.dart';
 import '../native.dart';
@@ -13,6 +14,7 @@ import '../rust/api/textlayer.dart';
 import 'convert.dart';
 import 'edit.dart';
 import 'enhance.dart';
+import 'errors.dart';
 import 'export_sheet.dart';
 import 'text.dart';
 import 'theme.dart';
@@ -97,7 +99,7 @@ class _DocPageState extends State<DocPage> {
     try {
       await body();
     } catch (e) {
-      _say('$e');
+      if (mounted) _say(humanError(L.of(context), e));
     } finally {
       if (mounted) {
         setState(() {
@@ -113,13 +115,18 @@ class _DocPageState extends State<DocPage> {
     if (mounted && n > 0) setState(() {});
   }
 
-  Future<void> _scan() => _guard(() async {
-        if (!await Native.scannerAvailable()) {
-          _say('这台设备没有系统扫描器（模拟器就没有），用「相册」导入照片测试');
-          return;
-        }
-        await _add(await Native.scan());
-      });
+  Future<void> _scan() {
+    // 先把这句话取出来。取在 _guard 里面的话, 是在 await 之后再碰 context ——
+    // 那时候这个页面可能已经被推走了
+    final noScanner = L.of(context).pagesNoScanner;
+    return _guard(() async {
+      if (!await Native.scannerAvailable()) {
+        _say(noScanner);
+        return;
+      }
+      await _add(await Native.scan());
+    });
+  }
 
   Future<void> _pick() => _guard(() async {
         final xs = await ImagePicker().pickMultiImage();
@@ -133,19 +140,22 @@ class _DocPageState extends State<DocPage> {
   /// 注意这条路是"渲染成图再 OCR", 哪怕原 PDF 本来就带文字层。原生的文字层
   /// 只有字和字号, 没有我们重建版式要的框线和栏位, 而这个 App 的价值恰恰在
   /// 版式 —— 所以宁可统一走识别, 也不做两条分叉的流水线
-  Future<void> _importPdf() => _guard(() async {
+  Future<void> _importPdf() {
+    final l = L.of(context);
+    return _guard(() async {
         final pdfs = await Native.pickPdf();
         if (pdfs.isEmpty) return;
         final got = <String>[];
         for (final (i, pdf) in pdfs.indexed) {
           _progress(pdfs.length == 1
-              ? '正在展开 PDF…'
-              : '正在展开第 ${i + 1} / ${pdfs.length} 个 PDF…');
+              ? l.pagesExpandingPdf
+              : l.pagesExpandingPdfN(i + 1, pdfs.length));
           got.addAll(await Native.pdfPages(pdf));
         }
         await _add(got);
-        if (mounted) _say('导入 ${got.length} 页');
-      });
+        if (mounted) _say(l.pagesImported(got.length));
+    });
+  }
 
   /// 先问选项再导。面板在 _guard 外面弹 —— 用户在那儿犹豫的十几秒里, 顶上
   /// 不该一直转着进度条, 底下四个按钮也不该是灰的
@@ -156,22 +166,23 @@ class _DocPageState extends State<DocPage> {
     final idx = only ?? _allIdx;
     if (idx.isEmpty) return;
     final opts = await askPdfOpts(context);
-    if (opts == null) return;
+    if (opts == null || !mounted) return;
+    final l = L.of(context);
     await _guard(() async {
       final paths = [for (final i in idx) _doc.pagePath(i)];
-      final texts = opts.searchable ? await _textLayer(paths) : null;
-      _progress('正在生成 PDF…');
+      final texts = opts.searchable ? await _textLayer(l, paths) : null;
+      _progress(l.pagesMakingPdf);
       // 挑着导的另起一个文件名: 沿用整份那个名字的话, 上一次导的完整版会被
       // 这三页悄悄顶掉, 而「文件」App 里看上去还是同一个文件
       final out = await _outPath('pdf',
-          suffix: only == null ? '' : '-选${idx.length}页');
+          suffix: only == null ? '' : l.pagesExportSuffix(idx.length));
       await Native.makePdf(paths, out, opts: opts, texts: texts);
       await HapticFeedback.lightImpact();
       if (only != null) _endSelect();
       // 先弹分享面板再提示。反过来的话, SnackBar 刚冒头就被面板盖住 ——
       // 等于没提示。面板关掉之后这句话才有人看得见
       await SharePlus.instance.share(ShareParams(files: [XFile(out)]));
-      _say('已导出到「文件」→ ScanPdf2Doc → out · ${opts.summary}');
+      _say(l.pagesExported(opts.summary(l)));
     });
   }
 
@@ -182,11 +193,12 @@ class _DocPageState extends State<DocPage> {
   Future<void> _enhanceMany(List<int> idx) async {
     if (_busy || idx.isEmpty) return;
     final e = await askEnhance(context, idx.length);
-    if (e == null) return;
+    if (e == null || !mounted) return;
+    final l = L.of(context);
     await _guard(() async {
       var bad = 0;
       for (final (n, i) in idx.indexed) {
-        _progress('正在增强 ${n + 1} / ${idx.length} 页…');
+        _progress(l.pagesEnhancing(n + 1, idx.length));
         final old = _doc.pages[i];
         final src = _doc.pagePath(i);
         try {
@@ -201,27 +213,28 @@ class _DocPageState extends State<DocPage> {
       await HapticFeedback.lightImpact();
       _endSelect();
       _say(bad == 0
-          ? '${idx.length} 页都用了「${e.label}」'
-          : '${idx.length - bad} 页成功，$bad 页没处理成');
+          ? l.pagesEnhanceDone(idx.length, e.label(l))
+          : l.pagesEnhancePartial(idx.length - bad, bad));
     });
   }
 
   Future<void> _deleteMany(List<int> idx) async {
     if (_busy || idx.isEmpty) return;
+    final l = L.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('删掉这 ${idx.length} 页？'),
-        content: const Text('这些页会从文档里移除，恢复不了。'),
+        title: Text(l.pagesDeleteManyTitle(idx.length)),
+        content: Text(l.pagesDeleteManyBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消')),
+              child: Text(l.commonCancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.commonDelete),
           ),
         ],
       ),
@@ -235,7 +248,7 @@ class _DocPageState extends State<DocPage> {
         await _doc.removePage(i);
       }
       _endSelect();
-      _say('已删除 ${idx.length} 页');
+      _say(l.pagesDeletedMany(idx.length));
     });
   }
 
@@ -243,13 +256,15 @@ class _DocPageState extends State<DocPage> {
   Future<void> _moveMany(List<int> idx) async {
     if (_busy || idx.isEmpty) return;
     final pick = await _pickTarget(idx.length);
-    if (pick == null) return;
+    if (pick == null || !mounted) return;
+    final l = L.of(context);
     await _guard(() async {
       final paths = [for (final i in idx) _doc.pagePath(i)];
-      final target =
-          pick is Doc ? pick : await DocStore.create(name: '${_doc.name} 拆出');
+      final target = pick is Doc
+          ? pick
+          : await DocStore.create(name: l.pagesSplitName(_doc.name));
       try {
-        _progress('正在移动 ${idx.length} 页…');
+        _progress(l.pagesMoving(idx.length));
         await target.addPages(paths);
       } catch (e) {
         // 刚为这次移动建的空文档, 没搬成就别留在列表里
@@ -269,8 +284,8 @@ class _DocPageState extends State<DocPage> {
       await HapticFeedback.lightImpact();
       _endSelect();
       _say(moved.length == idx.length
-          ? '${moved.length} 页已移到「${target.name}」'
-          : '${moved.length} 页移过去了，剩下 ${idx.length - moved.length} 页没动');
+          ? l.pagesMovedAll(moved.length, target.name)
+          : l.pagesMovedSome(moved.length, idx.length - moved.length));
     });
   }
 
@@ -292,6 +307,7 @@ class _DocPageState extends State<DocPage> {
       constraints: const BoxConstraints(maxWidth: Ui.readable),
       builder: (ctx) {
         final t = Theme.of(ctx).textTheme;
+        final l = L.of(ctx);
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -300,32 +316,33 @@ class _DocPageState extends State<DocPage> {
               Padding(
                 padding:
                     const EdgeInsets.fromLTRB(Ui.gapMd, 0, Ui.gapMd, Ui.gapSm),
-                child: Text('把这 $n 页移到', style: t.titleLarge),
+                child: Text(l.pagesMoveTitle(n), style: t.titleLarge),
               ),
               ListTile(
                 leading: const Icon(Icons.create_new_folder_outlined),
-                title: const Text('新建文档'),
-                subtitle: Text('叫「${_doc.name} 拆出」', style: t.bodySmall),
+                title: Text(l.commonNewDoc),
+                subtitle: Text(
+                    l.pagesMoveNewName(l.pagesSplitName(_doc.name)),
+                    style: t.bodySmall),
                 onTap: () => Navigator.of(ctx).pop('new'),
               ),
               if (others.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(Ui.gapMd),
-                  child: Text('还没有别的文档', style: t.bodySmall),
+                  child: Text(l.pagesNoOtherDocs, style: t.bodySmall),
                 ),
               for (final d in others)
                 ListTile(
                   leading: PageThumb(path: d.cover),
                   title:
                       Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('${d.count} 页', style: t.bodySmall),
+                  subtitle: Text(l.commonPages(d.count), style: t.bodySmall),
                   onTap: () => Navigator.of(ctx).pop(d),
                 ),
               Padding(
                 padding:
                     const EdgeInsets.fromLTRB(Ui.gapMd, Ui.gapSm, Ui.gapMd, 0),
-                child: Text('搬过去的是这几页现在的样子，那边不能再「还原」回没编辑的版本',
-                    style: t.bodySmall),
+                child: Text(l.pagesMoveNote, style: t.bodySmall),
               ),
             ],
           ),
@@ -352,7 +369,8 @@ class _DocPageState extends State<DocPage> {
   ///
   /// 某页认不出来就留空 —— 那一页退化成纯图片, 其余页照样能搜, 比整个导出
   /// 失败强
-  Future<List<List<Map<String, Object>>>> _textLayer(List<String> paths) async {
+  Future<List<List<Map<String, Object>>>> _textLayer(
+      L l, List<String> paths) async {
     final modelDir = await Models.ensure();
     var out = <List<Map<String, Object>>>[];
     await for (final p in ocrImages(
@@ -365,9 +383,9 @@ class _DocPageState extends State<DocPage> {
     )) {
       switch (p) {
         case OcrProgress_Loading():
-          _progress('正在加载识别模型…');
+          _progress(l.convertLoading);
         case OcrProgress_Page(:final index, :final total):
-          _progress('正在识别文字 $index / $total 页…');
+          _progress(l.convertPageOf(index, total));
         case OcrProgress_Done(:final pages):
           out = [
             for (final page in pages)
@@ -402,9 +420,11 @@ class _DocPageState extends State<DocPage> {
   }
 
   /// 文档名是用户随手起的, 直接当文件名会撞上路径分隔符
+  // 兜底用时间戳而不是某种语言的"扫描件": 名字被过滤成空是极少数情况, 而
+  // 让文件名跟着界面语言变, 在「文件」App 里反倒不好找回来
   static String _safeName(String s) {
     final t = s.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_').trim();
-    return t.isEmpty ? '扫描件-${stamp()}' : t;
+    return t.isEmpty ? stamp() : t;
   }
 
   Future<void> _edit(int i) async {
@@ -415,7 +435,7 @@ class _DocPageState extends State<DocPage> {
   }
 
   Future<void> _renameDoc() async {
-    final s = await askName(context, '重命名', _doc.name);
+    final s = await askName(context, L.of(context).commonRename, _doc.name);
     if (s == null) return;
     await _doc.rename(s);
     if (mounted) setState(() {});
@@ -423,6 +443,7 @@ class _DocPageState extends State<DocPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final n = _doc.count;
     // 多选着的时候按返回, 该是退出多选而不是退出这个文档 —— 后者会让人以为
     // 刚才勾的那几页出了什么事
@@ -431,24 +452,24 @@ class _DocPageState extends State<DocPage> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _selecting) _endSelect();
       },
-      child: _scaffold(n),
+      child: _scaffold(l, n),
     );
   }
 
-  Widget _scaffold(int n) {
+  Widget _scaffold(L l, int n) {
     return Scaffold(
-      appBar: _selecting ? _selectBar() : _titleBar(n),
+      appBar: _selecting ? _selectBar(l) : _titleBar(l, n),
       body: Stack(
         children: [
           n == 0
               ? EmptyHint(
                   icon: Icons.document_scanner_outlined,
-                  title: '还没有页',
-                  hint: '「扫描」拍纸质件，\n「相册」「PDF」导入已有文件',
-                  actionLabel: '开始扫描',
+                  title: l.pagesEmptyTitle,
+                  hint: l.pagesEmptyHint,
+                  actionLabel: l.pagesEmptyAction,
                   onAction: _busy ? null : _scan,
                 )
-              : _list(),
+              : _list(l),
           if (_busy)
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -470,13 +491,13 @@ class _DocPageState extends State<DocPage> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: _selecting ? _selectActions() : _mainActions(n),
+          child: _selecting ? _selectActions(l) : _mainActions(l, n),
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _titleBar(int n) {
+  PreferredSizeWidget _titleBar(L l, int n) {
     return AppBar(
       title: GestureDetector(
         onTap: _busy ? null : _renameDoc,
@@ -493,11 +514,11 @@ class _DocPageState extends State<DocPage> {
         if (n > 0) ...[
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
-            tooltip: '导出 PDF',
+            tooltip: l.pagesExportPdf,
             onPressed: _busy ? null : _exportPdf,
           ),
           PopupMenuButton<String>(
-            tooltip: '更多',
+            tooltip: l.commonMore,
             enabled: !_busy,
             onSelected: (v) {
               switch (v) {
@@ -510,32 +531,32 @@ class _DocPageState extends State<DocPage> {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'text',
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.text_fields_outlined),
-                  title: Text('提取文字'),
+                  leading: const Icon(Icons.text_fields_outlined),
+                  title: Text(l.pagesExtractText),
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'enhance',
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.auto_awesome_outlined),
-                  title: Text('全部增强'),
+                  leading: const Icon(Icons.auto_awesome_outlined),
+                  title: Text(l.pagesEnhanceAll),
                 ),
               ),
               const PopupMenuDivider(),
               // 长按也能进多选, 但只有长按的话没人找得到 —— 菜单里这一条是
               // 那个手势的说明书
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'select',
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.checklist),
-                  title: Text('选择页'),
-                  subtitle: Text('也可以长按某一页'),
+                  leading: const Icon(Icons.checklist),
+                  title: Text(l.pagesSelect),
+                  subtitle: Text(l.pagesSelectHint),
                 ),
               ),
             ],
@@ -545,22 +566,22 @@ class _DocPageState extends State<DocPage> {
     );
   }
 
-  PreferredSizeWidget _selectBar() {
+  PreferredSizeWidget _selectBar(L l) {
     final k = _sel!.length;
     final all = k > 0 && k == _doc.count;
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close),
-        tooltip: '退出多选',
+        tooltip: l.pagesSelectExit,
         onPressed: _busy ? null : _endSelect,
       ),
-      title: Text(k == 0 ? '选择页' : '已选 $k 页'),
+      title: Text(k == 0 ? l.pagesSelect : l.pagesSelected(k)),
       actions: [
         TextButton(
           onPressed: _busy
               ? null
               : () => setState(() => _sel = all ? <String>{} : {..._doc.pages}),
-          child: Text(all ? '全不选' : '全选'),
+          child: Text(all ? l.pagesSelectNone : l.pagesSelectAll),
         ),
       ],
     );
@@ -568,19 +589,19 @@ class _DocPageState extends State<DocPage> {
 
   /// 四个等宽按钮, 图标在上文字在下。窄屏上图标和文字并排会把"转文档"挤成
   /// 三行, 竖着排就不会
-  Widget _mainActions(int n) {
+  Widget _mainActions(L l, int n) {
     return Row(
       spacing: 8,
       children: [
         _Act(
           icon: Icons.document_scanner_outlined,
-          label: '扫描',
+          label: l.pagesActScan,
           primary: true,
           onTap: _busy ? null : _scan,
         ),
         _Act(
           icon: Icons.photo_library_outlined,
-          label: '相册',
+          label: l.pagesActPhotos,
           onTap: _busy ? null : _pick,
         ),
         _Act(
@@ -590,7 +611,7 @@ class _DocPageState extends State<DocPage> {
         ),
         _Act(
           icon: Icons.text_snippet_outlined,
-          label: '转文档',
+          label: l.pagesActConvert,
           tonal: true,
           onTap: _busy || n == 0 ? null : _convert,
         ),
@@ -599,7 +620,7 @@ class _DocPageState extends State<DocPage> {
   }
 
   /// 多选时底下这一排 —— 位置跟平时那排对齐, 手不用重新找
-  Widget _selectActions() {
+  Widget _selectActions(L l) {
     final idx = _selIdx;
     final on = !_busy && idx.isNotEmpty;
     return Row(
@@ -607,23 +628,23 @@ class _DocPageState extends State<DocPage> {
       children: [
         _Act(
           icon: Icons.auto_awesome_outlined,
-          label: '增强',
+          label: l.pagesActEnhance,
           onTap: on ? () => _enhanceMany(idx) : null,
         ),
         _Act(
           icon: Icons.drive_file_move_outlined,
-          label: '移动',
+          label: l.pagesActMove,
           onTap: on ? () => _moveMany(idx) : null,
         ),
         _Act(
           icon: Icons.picture_as_pdf_outlined,
-          label: '导出',
+          label: l.pagesActExport,
           tonal: true,
           onTap: on ? () => _exportPdf(only: idx) : null,
         ),
         _Act(
           icon: Icons.delete_outline,
-          label: '删除',
+          label: l.commonDelete,
           danger: true,
           onTap: on ? () => _deleteMany(idx) : null,
         ),
@@ -631,7 +652,7 @@ class _DocPageState extends State<DocPage> {
     );
   }
 
-  Widget _list() {
+  Widget _list(L l) {
     return Readable(
       child: ReorderableListView.builder(
         padding: const EdgeInsets.only(top: Ui.gapSm, bottom: Ui.gapLg),
@@ -648,7 +669,7 @@ class _DocPageState extends State<DocPage> {
           await _doc.reorder(a, b);
           if (mounted) setState(() {});
         },
-        itemBuilder: (ctx, i) => _tile(i),
+        itemBuilder: (ctx, i) => _tile(l, i),
       ),
     );
   }
@@ -671,20 +692,21 @@ class _DocPageState extends State<DocPage> {
   /// 而删除按钮就贴在拖拽手柄边上 —— 想拖着换个顺序, 手指偏一点就少一页,
   /// 而且没有任何提示。
   Future<void> _removePage(int i) async {
+    final l = L.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('删掉第 ${i + 1} 页？'),
-        content: const Text('这一页会从文档里移除，恢复不了。'),
+        title: Text(l.pagesDeleteOneTitle(i + 1)),
+        content: Text(l.pagesDeleteOneBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消')),
+              child: Text(l.commonCancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.commonDelete),
           ),
         ],
       ),
@@ -695,7 +717,7 @@ class _DocPageState extends State<DocPage> {
     if (mounted) setState(() {});
   }
 
-  Widget _tile(int i) {
+  Widget _tile(L l, int i) {
     final t = Theme.of(context);
     // 页文件名不会重复(见 Doc.nextSeq), 拿它当 key 和图片缓存键都是稳的
     final key = ValueKey(_doc.pages[i]);
@@ -706,7 +728,7 @@ class _DocPageState extends State<DocPage> {
               Icon(Icons.auto_fix_high_outlined,
                   size: 14, color: t.colorScheme.onSurfaceVariant),
               const SizedBox(width: Ui.gapXs),
-              Text('已编辑',
+              Text(l.pagesEdited,
                   style: t.textTheme.bodySmall
                       ?.copyWith(color: t.colorScheme.onSurfaceVariant)),
             ],
@@ -718,7 +740,7 @@ class _DocPageState extends State<DocPage> {
       return ListTile(
         key: key,
         leading: PageThumb(path: _doc.pagePath(i)),
-        title: Text('第 ${i + 1} 页'),
+        title: Text(l.commonPageN(i + 1)),
         subtitle: edited,
         selected: on,
         // 整行都能点。多选时只有右边那个小方块能点, 是二十页里点二十次的
@@ -736,7 +758,7 @@ class _DocPageState extends State<DocPage> {
       leading: PageThumb(path: _doc.pagePath(i)),
       // 不再显示文件名: 以前那是相机/相册给的名字, 还有点信息量; 现在页图
       // 是我们自己按页号命名的, 写出来就是一句废话
-      title: Text('第 ${i + 1} 页'),
+      title: Text(l.commonPageN(i + 1)),
       subtitle: edited,
       onTap: _busy ? null : () => _edit(i),
       onLongPress: _busy ? null : () => _startSelect(i),
@@ -746,7 +768,7 @@ class _DocPageState extends State<DocPage> {
           // 删除从"直接一个按钮"收进菜单。它原先就贴着拖拽手柄, 两个 40 点
           // 出头的命中区并排, 想拖着换顺序结果删掉一页是很容易发生的事
           PopupMenuButton<String>(
-            tooltip: '这一页的操作',
+            tooltip: l.pagesTileMenu,
             enabled: !_busy,
             onSelected: (v) {
               switch (v) {
@@ -762,19 +784,19 @@ class _DocPageState extends State<DocPage> {
               PopupMenuItem(
                 value: 'up',
                 enabled: i > 0,
-                child: const ListTile(
+                child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.arrow_upward),
-                  title: Text('上移'),
+                  leading: const Icon(Icons.arrow_upward),
+                  title: Text(l.pagesMoveUp),
                 ),
               ),
               PopupMenuItem(
                 value: 'down',
                 enabled: i < _doc.count - 1,
-                child: const ListTile(
+                child: ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.arrow_downward),
-                  title: Text('下移'),
+                  leading: const Icon(Icons.arrow_downward),
+                  title: Text(l.pagesMoveDown),
                 ),
               ),
               const PopupMenuDivider(),
@@ -784,7 +806,7 @@ class _DocPageState extends State<DocPage> {
                   contentPadding: EdgeInsets.zero,
                   leading:
                       Icon(Icons.delete_outline, color: t.colorScheme.error),
-                  title: Text('删除',
+                  title: Text(l.commonDelete,
                       style: TextStyle(color: t.colorScheme.error)),
                 ),
               ),
@@ -794,7 +816,7 @@ class _DocPageState extends State<DocPage> {
           ReorderableDragStartListener(
             index: i,
             child: Tooltip(
-              message: '按住拖动排序',
+              message: l.pagesDragHint,
               child: SizedBox(
                 width: Ui.tap,
                 height: Ui.tap,
@@ -823,10 +845,11 @@ Future<String?> askName(BuildContext context, String title, String init) async {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(L.of(ctx).commonCancel)),
         FilledButton(
             onPressed: () => Navigator.of(ctx).pop(c.text),
-            child: const Text('确定')),
+            child: Text(L.of(ctx).commonOk)),
       ],
     ),
   );
@@ -862,7 +885,15 @@ class _Act extends StatelessWidget {
       children: [
         Icon(icon, size: 22),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        // 底栏四等分, 而德语的「Verschieben」是 11 个字母 —— 窄屏上放不下,
+        // 又是一个词, 没有空格可以换行。只剩两条路: 截成「Verschie…」,
+        // 或者整体缩一点。缩比截好, 截掉之后那个按钮就认不出是干什么的了。
+        // scaleDown 只在真放不下时才动手, 中文英文这边一点变化都没有
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child:
+              Text(label, maxLines: 1, style: const TextStyle(fontSize: 12)),
+        ),
       ],
     );
     const pad = EdgeInsets.symmetric(vertical: 8);

@@ -30,6 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # 系统控件(日期选择、文本选择菜单、朗读)自带的那几十种语言。少了它,
+  # App 自己的字翻译好了, 长按选中弹出的还是 Cut/Copy/Paste
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -68,6 +73,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # 让 flutter 在 build 前自动把 lib/l10n/*.arb 生成成 Dart
+  generate: true
 
   assets:
     # 三个 ONNX 一共 32 MB, 不进仓库(见根 .gitignore), 构建前先跑 ./tool/models.sh

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../doc.dart';
+import 'language.dart';
 import 'pages.dart';
 import 'theme.dart';
 
@@ -56,34 +59,37 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _create() async {
-    final d = await DocStore.create();
+    // 名字在这儿起而不是让 DocStore 兜底: 那一层没有 BuildContext, 拿不到
+    // 当前语言, 只能写死一个中文名 —— 而这个名字是要落盘的, 一旦存下来就
+    // 跟着这份文档一辈子
+    final d = await DocStore.create(name: L.of(context).commonDefaultDocName(stamp()));
     if (!mounted) return;
     await _open(d);
   }
 
   Future<void> _rename(Doc d) async {
-    final s = await askName(context, '重命名', d.name);
+    final s = await askName(context, L.of(context).commonRename, d.name);
     if (s == null) return;
     await d.rename(s);
     await _reload();
   }
 
   Future<void> _delete(Doc d) async {
+    final l = L.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除这个文档？'),
-        content: Text('「${d.name}」的 ${d.count} 页会一起删掉，恢复不了。'
-            '已经导出的 PDF / Word 不受影响。'),
+        title: Text(l.homeDeleteTitle),
+        content: Text(l.homeDeleteBody(d.name, d.count)),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消')),
+              child: Text(l.commonCancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.commonDelete),
           ),
         ],
       ),
@@ -97,12 +103,13 @@ class _HomePageState extends State<HomePage> {
     if (mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('已删除「${d.name}」')));
+        ..showSnackBar(SnackBar(content: Text(l.homeDeleted(d.name))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     return Scaffold(
       appBar: AppBar(
         title: _searching
@@ -111,7 +118,7 @@ class _HomePageState extends State<HomePage> {
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: '搜文档名',
+                  hintText: l.homeSearchHint,
                   border: InputBorder.none,
                   // 清空和退出搜索是两件事: 以前只有一个 X, 想重打一个词
                   // 就得先退出搜索再点开
@@ -119,7 +126,7 @@ class _HomePageState extends State<HomePage> {
                       ? null
                       : IconButton(
                           icon: const Icon(Icons.cancel, size: 20),
-                          tooltip: '清空',
+                          tooltip: l.commonClear,
                           onPressed: () {
                             _search.clear();
                             setState(() => _q = '');
@@ -132,12 +139,17 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search),
-            tooltip: _searching ? '退出搜索' : '搜索',
+            tooltip: _searching ? l.homeSearchClose : l.homeSearchOpen,
             onPressed: () => setState(() {
               _searching = !_searching;
               _q = '';
               _search.clear();
             }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.translate),
+            tooltip: l.settingsLanguage,
+            onPressed: () => askLanguage(context),
           ),
         ],
       ),
@@ -145,21 +157,22 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),
-        label: const Text('新建'),
+        label: Text(l.homeNew),
       ),
     );
   }
 
   Widget _body() {
+    final l = L.of(context);
     if (_docs == null) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_docs!.isEmpty) {
       return EmptyHint(
         icon: Icons.folder_open_outlined,
-        title: '还没有文档',
-        hint: '一个文档就是一摞扫出来的页，\n可以整份导成 PDF 或者 Word',
-        actionLabel: '新建文档',
+        title: l.homeEmptyTitle,
+        hint: l.homeEmptyHint,
+        actionLabel: l.commonNewDoc,
         onAction: _create,
       );
     }
@@ -167,8 +180,8 @@ class _HomePageState extends State<HomePage> {
     if (xs.isEmpty) {
       return EmptyHint(
         icon: Icons.search_off_outlined,
-        title: '没有匹配的文档',
-        hint: '换个词试试，搜的是文档名',
+        title: l.homeNoMatchTitle,
+        hint: l.homeNoMatchHint,
       );
     }
     return Readable(
@@ -189,25 +202,26 @@ class _HomePageState extends State<HomePage> {
 
   Widget _tile(Doc d) {
     final t = Theme.of(context);
+    final l = L.of(context);
     return ListTile(
       key: ValueKey(d.id),
       leading: PageThumb(path: d.cover),
       title: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        '${d.count} 页 · ${_when(d.updated)}',
+        l.homeSubtitle(l.commonPages(d.count), _when(l, d.updated)),
         style: t.textTheme.bodySmall
             ?.copyWith(color: t.colorScheme.onSurfaceVariant),
       ),
       trailing: PopupMenuButton<String>(
-        tooltip: '更多',
+        tooltip: l.commonMore,
         onSelected: (v) => v == 'rename' ? _rename(d) : _delete(d),
         itemBuilder: (_) => [
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'rename',
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.drive_file_rename_outline),
-              title: Text('重命名'),
+              leading: const Icon(Icons.drive_file_rename_outline),
+              title: Text(l.commonRename),
             ),
           ),
           PopupMenuItem(
@@ -215,7 +229,8 @@ class _HomePageState extends State<HomePage> {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.delete_outline, color: t.colorScheme.error),
-              title: Text('删除', style: TextStyle(color: t.colorScheme.error)),
+              title: Text(l.commonDelete,
+                  style: TextStyle(color: t.colorScheme.error)),
             ),
           ),
         ],
@@ -225,13 +240,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// 相对时间, 精确到分就够了 —— 列表里没人关心秒
-  static String _when(DateTime t) {
+  ///
+  /// 30 天以上退回绝对日期。"384 天前"没人能换算成日子, 而这个 App 里
+  /// 隔了一年再翻出来的合同, 要的恰恰就是那个日子
+  static String _when(L l, DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return '刚刚';
-    if (d.inHours < 1) return '${d.inMinutes} 分钟前';
-    if (d.inDays < 1) return '${d.inHours} 小时前';
-    if (d.inDays < 30) return '${d.inDays} 天前';
-    String p(int v) => v.toString().padLeft(2, '0');
-    return '${t.year}-${p(t.month)}-${p(t.day)}';
+    if (d.inMinutes < 1) return l.timeJustNow;
+    if (d.inHours < 1) return l.timeMinutesAgo(d.inMinutes);
+    if (d.inDays < 1) return l.timeHoursAgo(d.inHours);
+    if (d.inDays < 30) return l.timeDaysAgo(d.inDays);
+    // 超过一个月就摆日期, 按当前语言的排法: 德语是 17.08.2026, 日语是
+    // 2026/08/17。原先那个 2026-08-17 是 ISO 写法 —— 只有写代码的人觉得
+    // 它理所当然。日期数据由 GlobalMaterialLocalizations 在挂载时初始化好
+    return DateFormat.yMd(l.localeName).format(t);
   }
 }

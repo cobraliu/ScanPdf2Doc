@@ -5,9 +5,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/l10n.dart';
 import '../doc.dart';
 import '../native.dart';
 import 'enhance.dart';
+import 'errors.dart';
 import 'theme.dart';
 
 /// 单页编辑: 增强 / 转 90° / 拖四个角重裁 / 退回原图
@@ -76,7 +78,8 @@ class _EditPageState extends State<EditPage> {
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text('$e')));
+          ..showSnackBar(
+              SnackBar(content: Text(humanError(L.of(context), e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -130,6 +133,7 @@ class _EditPageState extends State<EditPage> {
     // 一圈亮色会把眼睛往外拽 —— 系统相册、相机的编辑界面都是黑底, 是同一个
     // 道理。但工具栏和按钮得跟着变, 否则亮色主题的白 AppBar 压在黑画布上,
     // 分割线和图标的对比度全乱
+    final l = L.of(context);
     return Theme(
       data: Ui.dark(),
       child: Builder(builder: (ctx) {
@@ -137,13 +141,13 @@ class _EditPageState extends State<EditPage> {
         return Scaffold(
           backgroundColor: t.colorScheme.surfaceContainerLowest,
           appBar: AppBar(
-            title: Text('第 ${_i + 1} 页'),
+            title: Text(l.commonPageN(_i + 1)),
             actions: [
               if (_doc.hasOriginal(_i) && !_cropping)
                 TextButton.icon(
                   onPressed: _busy ? null : _restore,
                   icon: const Icon(Icons.restore, size: 18),
-                  label: const Text('还原'),
+                  label: Text(l.editRestore),
                 ),
             ],
           ),
@@ -262,13 +266,14 @@ class _EditPageState extends State<EditPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: Enhance.values.length,
         separatorBuilder: (_, _) => const SizedBox(width: Ui.gapSm),
-        itemBuilder: (_, i) {
+        itemBuilder: (ctx, i) {
           final e = Enhance.values[i];
+          final l = L.of(ctx);
           return Center(
             child: ActionChip(
               avatar: Icon(e.icon, size: 18),
-              label: Text(e.label),
-              tooltip: e.hint,
+              label: Text(e.label(l)),
+              tooltip: e.hint(l),
               onPressed: _busy ? null : () => _enhance(e),
             ),
           );
@@ -305,13 +310,13 @@ class _EditPageState extends State<EditPage> {
                                 _resetCorners();
                                 _cropping = false;
                               }),
-                      child: const Text('取消'),
+                      child: Text(L.of(context).commonCancel),
                     ),
                   ),
                   Expanded(
                     child: FilledButton(
                       onPressed: _busy || !_quadOk ? null : _applyCrop,
-                      child: const Text('应用裁切'),
+                      child: Text(L.of(context).editApplyCrop),
                     ),
                   ),
                 ],
@@ -325,14 +330,14 @@ class _EditPageState extends State<EditPage> {
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : () => _rotate(3),
                       icon: const Icon(Icons.rotate_90_degrees_ccw_outlined),
-                      label: const Text('左转'),
+                      label: Text(L.of(context).editRotateLeft),
                     ),
                   ),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : () => _rotate(1),
                       icon: const Icon(Icons.rotate_90_degrees_cw_outlined),
-                      label: const Text('右转'),
+                      label: Text(L.of(context).editRotateRight),
                     ),
                   ),
                   Expanded(
@@ -340,7 +345,7 @@ class _EditPageState extends State<EditPage> {
                       onPressed:
                           _busy ? null : () => setState(() => _cropping = true),
                       icon: const Icon(Icons.crop),
-                      label: const Text('裁切'),
+                      label: Text(L.of(context).editCrop),
                     ),
                   ),
                 ],

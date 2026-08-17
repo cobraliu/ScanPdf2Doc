@@ -1,0 +1,420 @@
+{
+  "@@locale": "en",
+  "commonCancel": "Cancel",
+  "commonOk": "OK",
+  "commonDelete": "Delete",
+  "commonRename": "Rename",
+  "commonMore": "More",
+  "commonClear": "Clear",
+  "commonRetry": "Try again",
+  "commonNewDoc": "New document",
+  "commonPageN": "Page {n}",
+  "@commonPageN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "commonPages": "{count, plural, =1{1 page} other{{count} pages}}",
+  "@commonPages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commonScan": "Scan",
+  "commonDefaultDocName": "Scan {stamp}",
+  "@commonDefaultDocName": {
+    "placeholders": {
+      "stamp": {
+        "type": "String"
+      }
+    }
+  },
+  "timeJustNow": "just now",
+  "timeMinutesAgo": "{n, plural, =1{1 minute ago} other{{n} minutes ago}}",
+  "@timeMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "timeHoursAgo": "{n, plural, =1{1 hour ago} other{{n} hours ago}}",
+  "@timeHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "timeDaysAgo": "{n, plural, =1{1 day ago} other{{n} days ago}}",
+  "@timeDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "homeSearchHint": "Search by name",
+  "homeSearchOpen": "Search",
+  "homeSearchClose": "Close search",
+  "homeNew": "New",
+  "homeEmptyTitle": "No documents yet",
+  "homeEmptyHint": "A document is a stack of scanned pages.\nExport the whole stack as PDF or Word.",
+  "homeNoMatchTitle": "No matching documents",
+  "homeNoMatchHint": "Try another word — this searches document names.",
+  "homeDeleteTitle": "Delete this document?",
+  "homeDeleteBody": "{count, plural, =1{The 1 page in “{name}” will be deleted for good.} other{All {count} pages in “{name}” will be deleted for good.}} PDFs and Word files you already exported are not affected.",
+  "@homeDeleteBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeDeleted": "Deleted “{name}”",
+  "@homeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeSubtitle": "{pages} · {when}",
+  "@homeSubtitle": {
+    "placeholders": {
+      "pages": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLanguage": "Language",
+  "languageSystem": "Match system",
+  "pagesNoScanner": "This device has no system scanner (simulators never do). Use Photos to import an image instead.",
+  "pagesEmptyTitle": "No pages yet",
+  "pagesEmptyHint": "“Scan” photographs paper.\n“Photos” and “PDF” import files you already have.",
+  "pagesEmptyAction": "Start scanning",
+  "pagesActScan": "Scan",
+  "pagesActPhotos": "Photos",
+  "pagesActConvert": "Convert",
+  "pagesActEnhance": "Enhance",
+  "pagesActMove": "Move",
+  "pagesActExport": "Export",
+  "pagesExportPdf": "Export PDF",
+  "pagesExtractText": "Extract text",
+  "pagesEnhanceAll": "Enhance all",
+  "pagesSelect": "Select pages",
+  "pagesSelectHint": "You can also long-press a page",
+  "pagesSelectExit": "Leave selection",
+  "pagesSelected": "{count, plural, =1{1 selected} other{{count} selected}}",
+  "@pagesSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesSelectAll": "Select all",
+  "pagesSelectNone": "Deselect all",
+  "pagesExpandingPdf": "Opening the PDF…",
+  "pagesExpandingPdfN": "Opening PDF {index} of {total}…",
+  "@pagesExpandingPdfN": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesImported": "{count, plural, =1{Imported 1 page} other{Imported {count} pages}}",
+  "@pagesImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesMakingPdf": "Building the PDF…",
+  "pagesExportSuffix": "-{count}pages",
+  "@pagesExportSuffix": {
+    "description": "Appended to the file name when only some pages are exported. Keep it filename-safe: no slashes, colons or quotes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesExported": "Saved to Files → ScanPdf2Doc → out · {summary}",
+  "@pagesExported": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "pagesEnhancing": "Enhancing page {index} of {total}…",
+  "@pagesEnhancing": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesEnhanceDone": "{count, plural, =1{1 page set to “{mode}”} other{{count} pages set to “{mode}”}}",
+  "@pagesEnhanceDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "pagesEnhancePartial": "{ok} done, {bad} could not be processed",
+  "@pagesEnhancePartial": {
+    "placeholders": {
+      "ok": {
+        "type": "int"
+      },
+      "bad": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesDeleteOneTitle": "Delete page {n}?",
+  "@pagesDeleteOneTitle": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesDeleteOneBody": "This page will be removed from the document for good.",
+  "pagesDeleteManyTitle": "{count, plural, =1{Delete this page?} other{Delete these {count} pages?}}",
+  "@pagesDeleteManyTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesDeleteManyBody": "These pages will be removed from the document for good.",
+  "pagesDeletedMany": "{count, plural, =1{Deleted 1 page} other{Deleted {count} pages}}",
+  "@pagesDeletedMany": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesMoving": "{count, plural, =1{Moving 1 page…} other{Moving {count} pages…}}",
+  "@pagesMoving": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesMoveTitle": "{count, plural, =1{Move this page to} other{Move these {count} pages to}}",
+  "@pagesMoveTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesMoveNewName": "Named “{name}”",
+  "@pagesMoveNewName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pagesSplitName": "{name} (split)",
+  "@pagesSplitName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pagesNoOtherDocs": "There are no other documents yet",
+  "pagesMoveNote": "Pages move over as they look now — the copy over there can no longer be restored to its unedited version.",
+  "pagesMovedAll": "{count, plural, =1{1 page moved to “{name}”} other{{count} pages moved to “{name}”}}",
+  "@pagesMovedAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pagesMovedSome": "{moved} moved, {rest} stayed behind",
+  "@pagesMovedSome": {
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "rest": {
+        "type": "int"
+      }
+    }
+  },
+  "pagesEdited": "Edited",
+  "pagesTileMenu": "Actions for this page",
+  "pagesMoveUp": "Move up",
+  "pagesMoveDown": "Move down",
+  "pagesDragHint": "Hold and drag to reorder",
+  "editRestore": "Restore",
+  "editRotateLeft": "Rotate left",
+  "editRotateRight": "Rotate right",
+  "editCrop": "Crop",
+  "editApplyCrop": "Apply crop",
+  "enhanceAuto": "Auto",
+  "enhanceAutoHint": "Flattens the background and removes shadows, keeps the colour. Pick this one first.",
+  "enhanceLight": "Brighten",
+  "enhanceLightHint": "Lifts the brightness a little. Stays closest to the original.",
+  "enhanceGray": "Grayscale",
+  "enhanceGrayHint": "Drops the colour. Stamps and photos keep their shading.",
+  "enhanceBw": "B & W",
+  "enhanceBwHint": "Blackest text on whitest paper. Best for text-only pages, smallest PDF.",
+  "enhanceSheetTitle": "{count, plural, =1{Enhance this page} other{Enhance these {count} pages}}",
+  "@enhanceSheetTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "enhanceSheetNote": "Every page keeps the way it looked before. Open a page and tap Restore to go back.",
+  "exportTitle": "Export PDF",
+  "exportSize": "Page size",
+  "exportSizeFit": "Fit image",
+  "exportSizeFitNote": "The sheet follows the image’s aspect ratio, so receipts and ID cards don’t sit alone in the middle of an A4 page.",
+  "exportSizeFixedNote": "The image is scaled and centred; pages shot in landscape get a landscape sheet.",
+  "exportMargin": "Margin",
+  "exportMarginNone": "None",
+  "exportMarginNarrow": "Narrow",
+  "exportMarginNormal": "Normal",
+  "exportMarginNoneLabel": "No margin",
+  "exportMarginNarrowLabel": "Narrow margin",
+  "exportMarginNormalLabel": "Normal margin",
+  "exportQuality": "Image quality",
+  "exportQualitySmall": "Small",
+  "exportQualityHigh": "High",
+  "exportQualityOriginal": "Original",
+  "exportQualitySmallLabel": "Saves space",
+  "exportQualityHighLabel": "High quality",
+  "exportQualityOriginalLabel": "Original quality",
+  "exportQualityOriginalNote": "No compression at all — the largest file.",
+  "exportQuality1600Note": "Long edge capped at 1600 px. Good for sending to someone.",
+  "exportQuality2400Note": "Long edge capped at 2400 px. Still sharp in print.",
+  "exportSearchable": "Searchable",
+  "exportSearchableTag": "searchable",
+  "exportSearchableOn": "Reads the text first, then builds the PDF — a second or two per page. The result can be searched, selected and copied.",
+  "exportSearchableOff": "You get an image-only PDF; the words inside can’t be found.",
+  "convertTitle": "Convert to document",
+  "convertTitleField": "Title",
+  "convertTitleHelp": "Used both as the file name and as the heading inside Word",
+  "convertWord": "Word",
+  "convertExcel": "Excel",
+  "convertBoth": "Both",
+  "convertPreparing": "Getting ready",
+  "convertLoading": "Loading models",
+  "convertPageOf": "Reading page {index} of {total}",
+  "@convertPageOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "convertWriting": "Writing the file",
+  "convertStart": "Start",
+  "convertAgain": "Run it again",
+  "convertDone": "{pages, plural, =1{Done: 1 page} other{Done: {pages} pages}}",
+  "@convertDone": {
+    "placeholders": {
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+  "convertDoneTables": "{n, plural, =1{, 1 table} other{, {n} tables}}",
+  "@convertDoneTables": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "convertFailed": "{n, plural, =1{1 page could not be read (the rest export as usual):} other{{n} pages could not be read (the rest export as usual):}}",
+  "@convertFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "convertWhere": "The files are also in the Files app → On My iPad → ScanPdf2Doc → out",
+  "ocrFirstPageNote": "The first page takes longer — that’s when the models actually load.",
+  "textTitle": "Extract text",
+  "textCopyAll": "Copy everything",
+  "textCopyPage": "Copy this page",
+  "textExportTxt": "Export .txt",
+  "textAll": "all the text",
+  "textCopied": "Copied {what}",
+  "@textCopied": {
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "textPageMarker": "[Page {n}]",
+  "@textPageMarker": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "textFailedTitle": "Couldn’t read it",
+  "textNothingTitle": "Not a single word came out",
+  "textNothingHint": "If these pages really are photos or drawings, that’s correct.\nIf there is text on them, go back and use Enhance to flatten the background, then try again.",
+  "textPageEmpty": "No text found on this page",
+  "errorGeneric": "Something went wrong: {detail}",
+  "@errorGeneric": {
+    "description": "Fallback for errors coming from the native/Rust side. Those diagnostics are always in Chinese by design — this wrapper at least tells the user in their own language that it failed, and keeps the original text for a screenshot.",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "enhanceTooOld": "Auto enhance needs iOS 16 or later. Try Brighten, Grayscale or B & W instead.",
+  "@enhanceTooOld": {
+    "description": "Shown when CIDocumentEnhancer is unavailable (iOS 15)."
+  }
+}
