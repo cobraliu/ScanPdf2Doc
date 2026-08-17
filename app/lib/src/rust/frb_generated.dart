@@ -94,6 +94,7 @@ abstract class RustLibApi extends BaseApi {
     required OutFormat format,
     required int longEdge,
     required bool lowMemory,
+    String? recFile,
   });
 
   Stream<OcrProgress> crateApiTextlayerOcrImages({
@@ -101,6 +102,7 @@ abstract class RustLibApi extends BaseApi {
     required List<String> images,
     required int longEdge,
     required bool lowMemory,
+    String? recFile,
   });
 }
 
@@ -160,6 +162,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required OutFormat format,
     required int longEdge,
     required bool lowMemory,
+    String? recFile,
   }) {
     final sink = RustStreamSink<Progress>();
     unawaited(
@@ -174,6 +177,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             sse_encode_out_format(format, serializer);
             sse_encode_u_32(longEdge, serializer);
             sse_encode_bool(lowMemory, serializer);
+            sse_encode_opt_String(recFile, serializer);
             sse_encode_StreamSink_progress_Sse(sink, serializer);
             pdeCallFfi(
               generalizedFrbRustBinding,
@@ -195,6 +199,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             format,
             longEdge,
             lowMemory,
+            recFile,
             sink,
           ],
           apiImpl: this,
@@ -215,6 +220,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "format",
           "longEdge",
           "lowMemory",
+          "recFile",
           "sink",
         ],
       );
@@ -225,6 +231,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<String> images,
     required int longEdge,
     required bool lowMemory,
+    String? recFile,
   }) {
     final sink = RustStreamSink<OcrProgress>();
     unawaited(
@@ -236,6 +243,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             sse_encode_list_String(images, serializer);
             sse_encode_u_32(longEdge, serializer);
             sse_encode_bool(lowMemory, serializer);
+            sse_encode_opt_String(recFile, serializer);
             sse_encode_StreamSink_ocr_progress_Sse(sink, serializer);
             pdeCallFfi(
               generalizedFrbRustBinding,
@@ -249,7 +257,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeErrorData: sse_decode_AnyhowException,
           ),
           constMeta: kCrateApiTextlayerOcrImagesConstMeta,
-          argValues: [modelDir, images, longEdge, lowMemory, sink],
+          argValues: [modelDir, images, longEdge, lowMemory, recFile, sink],
           apiImpl: this,
         ),
       ),
@@ -259,7 +267,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiTextlayerOcrImagesConstMeta => const TaskConstMeta(
     debugName: "ocr_images",
-    argNames: ["modelDir", "images", "longEdge", "lowMemory", "sink"],
+    argNames: [
+      "modelDir",
+      "images",
+      "longEdge",
+      "lowMemory",
+      "recFile",
+      "sink",
+    ],
   );
 
   @protected

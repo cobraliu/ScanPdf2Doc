@@ -1207,8 +1207,8 @@ dependencies = [
 
 [[package]]
 name = "scannedpdf2doc"
-version = "0.1.3"
-source = "git+https://github.com/cobraliu/ScannedPdf2Doc-rust?tag=v0.1.3#dc7a1f5f342437bc72cc5b3edbff4f5d5d509237"
+version = "0.1.4"
+source = "git+https://github.com/cobraliu/ScannedPdf2Doc-rust?tag=v0.1.4#8b75fc9d73e6edf32e932a5e72cf27dd618d74f9"
 dependencies = [
  "anyhow",
  "chrono",

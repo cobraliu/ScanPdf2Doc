@@ -18,6 +18,9 @@ part 'convert.freezed.dart';
 /// - `images` 按最终页序排好的图片路径, 顺序即页序
 /// - `low_memory` 见 EngineOptions::low_memory(): 峰值省 ~130 MB, 几乎不费时间。
 ///   手机上没有理由关掉它
+/// - `rec_file` 换识别模型, 也就是换识别语言; None = 用内置那个中英混排的。
+///   给的是 `model_dir` 里的文件名, 哪个语言对哪个文件由 Dart 那侧的语言表
+///   说了算 —— 下载地址也在那边, 这里不该也存一份
 Stream<Progress> convertImages({
   required String modelDir,
   required List<String> images,
@@ -26,6 +29,7 @@ Stream<Progress> convertImages({
   required OutFormat format,
   required int longEdge,
   required bool lowMemory,
+  String? recFile,
 }) => RustLib.instance.api.crateApiConvertConvertImages(
   modelDir: modelDir,
   images: images,
@@ -34,12 +38,13 @@ Stream<Progress> convertImages({
   format: format,
   longEdge: longEdge,
   lowMemory: lowMemory,
+  recFile: recFile,
 );
 
 /// 给 examples / 集成测试用的直通口子: 按手机上那套默认参数跑一遍, 出 docx
 ///
-/// 单独开一个而不是把 convert_inner 设成 pub, 是因为 convert_inner 的八个
-/// 参数里有一半在验证时永远是同一个值, 每次都抄一遍容易抄错。
+/// 单独开一个而不是把 convert_inner 设成 pub, 是因为 convert_inner 的九个
+/// 参数里有一多半在验证时永远是同一个值, 每次都抄一遍容易抄错。
 Future<ConvertReport> convertForTest({
   required String modelDir,
   required List<String> images,

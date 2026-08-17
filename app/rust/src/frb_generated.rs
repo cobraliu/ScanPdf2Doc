@@ -117,6 +117,7 @@ fn wire__crate__api__convert__convert_images_impl(
             let api_format = <crate::api::convert::OutFormat>::sse_decode(&mut deserializer);
             let api_long_edge = <u32>::sse_decode(&mut deserializer);
             let api_low_memory = <bool>::sse_decode(&mut deserializer);
+            let api_rec_file = <Option<String>>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::convert::Progress,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -133,6 +134,7 @@ fn wire__crate__api__convert__convert_images_impl(
                             api_format,
                             api_long_edge,
                             api_low_memory,
+                            api_rec_file,
                             api_sink,
                         )?;
                         Ok(output_ok)
@@ -168,6 +170,7 @@ fn wire__crate__api__textlayer__ocr_images_impl(
             let api_images = <Vec<String>>::sse_decode(&mut deserializer);
             let api_long_edge = <u32>::sse_decode(&mut deserializer);
             let api_low_memory = <bool>::sse_decode(&mut deserializer);
+            let api_rec_file = <Option<String>>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::textlayer::OcrProgress,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -181,6 +184,7 @@ fn wire__crate__api__textlayer__ocr_images_impl(
                             api_images,
                             api_long_edge,
                             api_low_memory,
+                            api_rec_file,
                             api_sink,
                         )?;
                         Ok(output_ok)

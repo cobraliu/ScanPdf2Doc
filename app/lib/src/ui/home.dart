@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/l10n.dart';
 import '../doc.dart';
-import 'language.dart';
+import 'settings_page.dart';
 import 'pages.dart';
 import 'theme.dart';
 
@@ -147,9 +147,10 @@ class _HomePageState extends State<HomePage> {
             }),
           ),
           IconButton(
-            icon: const Icon(Icons.translate),
-            tooltip: l.settingsLanguage,
-            onPressed: () => askLanguage(context),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: l.settingsTitle,
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsPage())),
           ),
         ],
       ),

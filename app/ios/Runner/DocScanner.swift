@@ -120,6 +120,14 @@ class DocScanner: NSObject {
                 return
             }
             pdfPages(pdf: pdf, longEdge: CGFloat(a["longEdge"] as? Int ?? 2560), result)
+        case "excludeFromBackup":
+            guard let a = call.arguments as? [String: Any],
+                  let path = a["path"] as? String
+            else {
+                result(FlutterError(code: "args", message: "excludeFromBackup 参数不对", details: nil))
+                return
+            }
+            result(Self.excludeFromBackup(path))
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -483,6 +491,31 @@ class DocScanner: NSObject {
         guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
         else { return UIImage(contentsOfFile: path) }
         return UIImage(cgImage: cg)
+    }
+
+    // MARK: - 备份开关
+
+    /// 把一个目录标成"不进 iCloud 备份"
+    ///
+    /// 模型是能重新弄出来的东西 —— 内置那三个从 App 包里解, 语言包从网上下 ——
+    /// 按 Apple 的存储规矩(App Store 审核指南 5.5.2 引的那份 iOS Data Storage
+    /// Guidelines), 这类文件不该占用户的 iCloud 空间。三个内置模型加一个语言包
+    /// 就是 40 MB, 而免费的 iCloud 一共才 5 GB。
+    ///
+    /// 标在目录上, 目录里后来新增的文件也跟着算 —— 所以下载语言包之前不用
+    /// 再标一次。
+    ///
+    /// 返回真假而不是抛错: 标不上顶多是多备份了几十兆, 不该让识别跑不起来。
+    private static func excludeFromBackup(_ path: String) -> Bool {
+        var url = URL(fileURLWithPath: path)
+        var v = URLResourceValues()
+        v.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(v)
+            return true
+        } catch {
+            return false
+        }
     }
 
     // MARK: - 导入 PDF

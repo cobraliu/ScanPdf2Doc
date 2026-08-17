@@ -61,13 +61,14 @@ class _TextPageState extends State<TextPage> {
       _frac = null;
     });
     try {
-      final modelDir = await Models.ensure();
+      final ocr = await Models.setup();
       await for (final p in ocrImages(
-        modelDir: modelDir,
+        modelDir: ocr.dir,
         images: widget.pages,
         // 跟另外两条路同一个值。同一份文件在三个地方认出不一样的字, 没法解释
         longEdge: 2560,
         lowMemory: true,
+        recFile: ocr.recFile,
       )) {
         if (!mounted) return;
         switch (p) {

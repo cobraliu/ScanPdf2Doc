@@ -47,6 +47,10 @@ dependencies:
   image_picker: ^1.2.3
   freezed_annotation: ^3.1.0
 
+  # 只用它算个 sha256, 校验下载回来的语言包。本来是 pubspec.lock 里的
+  # 传递依赖, 这里提上来当直接依赖 —— 要 import 就得写明
+  crypto: ^3.0.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

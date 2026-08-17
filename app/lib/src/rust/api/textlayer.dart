@@ -13,16 +13,20 @@ part 'textlayer.freezed.dart';
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// 逐页识别, 只出文字和坐标
+///
+/// `rec_file` 见 [`crate::api::convert::convert_images`]
 Stream<OcrProgress> ocrImages({
   required String modelDir,
   required List<String> images,
   required int longEdge,
   required bool lowMemory,
+  String? recFile,
 }) => RustLib.instance.api.crateApiTextlayerOcrImages(
   modelDir: modelDir,
   images: images,
   longEdge: longEdge,
   lowMemory: lowMemory,
+  recFile: recFile,
 );
 
 @freezed

@@ -108,4 +108,19 @@ class Native {
     });
     return r ?? out;
   }
+
+  /// 把一个目录标成"不进 iCloud 备份"
+  ///
+  /// 只对模型目录用: 那里的东西全是能重新弄出来的(内置的从 App 包里解,
+  /// 语言包从网上下), 不该占用户的 iCloud 空间。
+  ///
+  /// 失败只当没标上, 不抛 —— 多备份几十兆是小事, 为它挡住识别是大事
+  static Future<bool> excludeFromBackup(String path) async {
+    try {
+      return await _ch.invokeMethod<bool>('excludeFromBackup', {'path': path}) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

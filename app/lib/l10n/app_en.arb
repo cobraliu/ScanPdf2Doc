@@ -97,7 +97,7 @@
       }
     }
   },
-  "settingsLanguage": "Language",
+  "settingsLanguage": "App language",
   "languageSystem": "Match system",
   "pagesNoScanner": "This device has no system scanner (simulators never do). Use Photos to import an image instead.",
   "pagesEmptyTitle": "No pages yet",
@@ -416,5 +416,60 @@
   "enhanceTooOld": "Auto enhance needs iOS 16 or later. Try Brighten, Grayscale or B & W instead.",
   "@enhanceTooOld": {
     "description": "Shown when CIDocumentEnhancer is unavailable (iOS 15)."
+  },
+  "settingsTitle": "Settings",
+  "@settingsLanguage": {
+    "description": "Row label for the UI language picker. Must read clearly next to settingsOcrLang."
+  },
+  "settingsOcrLang": "Recognition language",
+  "@settingsOcrLang": {
+    "description": "Row label and page title for the OCR language picker."
+  },
+  "ocrLangIntro": "The recognition language decides which characters can be read. It has nothing to do with the app language. Only one at a time — pick Korean and Chinese characters in the same file will not be recognised.",
+  "@ocrLangIntro": {
+    "description": "Explains that recognition language and app language are unrelated, and that only one script is recognised at a time."
+  },
+  "ocrLangBuiltin": "Chinese · English",
+  "ocrLangBuiltinNote": "Chinese, English, Japanese kana, Latin and Greek letters",
+  "ocrLangKo": "Korean",
+  "ocrLangKoNote": "Hangul. The built-in set holds no Korean at all",
+  "ocrLangJa": "Japanese",
+  "ocrLangJaNote": "Kana and kanji already work built in. Only worth it if they come out wrong",
+  "ocrLangRu": "Russian and Cyrillic",
+  "ocrLangRuNote": "Russian, Ukrainian, Serbian and more",
+  "ocrLangAr": "Arabic",
+  "ocrLangArNote": "Arabic, Persian, Urdu and more",
+  "ocrLangTh": "Thai",
+  "ocrLangThNote": "Thai script",
+  "ocrLangHi": "Hindi and Devanagari",
+  "ocrLangHiNote": "Hindi, Marathi, Nepali and more",
+  "ocrLangDownload": "Download",
+  "ocrLangDeleteTitle": "Delete the {name} pack?",
+  "@ocrLangDeleteTitle": {
+    "description": "Confirm dialog title before deleting a downloaded language pack.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "ocrLangDeleteBody": "You can download it again any time.",
+  "ocrLangFailed": "Download failed: {detail}",
+  "@ocrLangFailed": {
+    "description": "Snackbar when a language pack download fails; detail already went through humanError().",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "ocrLangSwitched": "Now reading {name}",
+  "@ocrLangSwitched": {
+    "description": "Snackbar right after a pack finishes downloading and is switched to automatically.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   }
 }

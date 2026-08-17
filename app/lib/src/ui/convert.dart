@@ -70,12 +70,12 @@ class _ConvertPageState extends State<ConvertPage> {
       _frac = null;
     });
     try {
-      final modelDir = await Models.ensure();
+      final ocr = await Models.setup();
       final base = await getApplicationDocumentsDirectory();
       final outDir = '${base.path}/out';
 
       final s = convertImages(
-        modelDir: modelDir,
+        modelDir: ocr.dir,
         images: widget.pages,
         outDir: outDir,
         title: _title.text.trim().isEmpty ? fallback : _title.text.trim(),
@@ -84,6 +84,8 @@ class _ConvertPageState extends State<ConvertPage> {
         longEdge: 2560,
         // 峰值省 ~130 MB, 几乎不费时间。手机上没有理由关
         lowMemory: true,
+        // 认哪种语言的字。null 就是内置那个中英混排的
+        recFile: ocr.recFile,
       );
 
       await for (final p in s) {

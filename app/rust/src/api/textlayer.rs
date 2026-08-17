@@ -52,16 +52,26 @@ pub enum OcrProgress {
 }
 
 /// 逐页识别, 只出文字和坐标
+///
+/// `rec_file` 见 [`crate::api::convert::convert_images`]
 pub fn ocr_images(
     model_dir: String,
     images: Vec<String>,
     long_edge: u32,
     low_memory: bool,
+    rec_file: Option<String>,
     sink: StreamSink<OcrProgress>,
 ) -> Result<()> {
-    let pages = ocr_inner(&model_dir, &images, long_edge, low_memory, &mut |p| {
-        let _ = sink.add(p);
-    })?;
+    let pages = ocr_inner(
+        &model_dir,
+        &images,
+        long_edge,
+        low_memory,
+        rec_file,
+        &mut |p| {
+            let _ = sink.add(p);
+        },
+    )?;
     let _ = sink.add(OcrProgress::Done { pages });
     Ok(())
 }
@@ -73,6 +83,7 @@ fn ocr_inner(
     images: &[String],
     long_edge: u32,
     low_memory: bool,
+    rec_file: Option<String>,
     on: &mut dyn FnMut(OcrProgress),
 ) -> Result<Vec<PageText>> {
     if images.is_empty() {
@@ -84,10 +95,13 @@ fn ocr_inner(
     };
 
     on(OcrProgress::Loading);
-    let opts = if low_memory {
-        EngineOptions::low_memory()
-    } else {
-        EngineOptions::default()
+    let opts = EngineOptions {
+        rec_file,
+        ..if low_memory {
+            EngineOptions::low_memory()
+        } else {
+            EngineOptions::default()
+        }
     };
     let mut engine = Engine::load_with(Path::new(model_dir), opts).context("加载模型")?;
 

@@ -371,15 +371,16 @@ class _DocPageState extends State<DocPage> {
   /// 失败强
   Future<List<List<Map<String, Object>>>> _textLayer(
       L l, List<String> paths) async {
-    final modelDir = await Models.ensure();
+    final ocr = await Models.setup();
     var out = <List<Map<String, Object>>>[];
     await for (final p in ocrImages(
-      modelDir: modelDir,
+      modelDir: ocr.dir,
       images: paths,
       // 跟「转文档」同一个值: 识别效果对这个数很敏感, 两条路给出的文字
       // 不一致会很难解释
       longEdge: 2560,
       lowMemory: true,
+      recFile: ocr.recFile,
     )) {
       switch (p) {
         case OcrProgress_Loading():

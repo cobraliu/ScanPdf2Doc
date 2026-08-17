@@ -61,6 +61,9 @@ pub struct ConvertReport {
 /// - `images` 按最终页序排好的图片路径, 顺序即页序
 /// - `low_memory` 见 EngineOptions::low_memory(): 峰值省 ~130 MB, 几乎不费时间。
 ///   手机上没有理由关掉它
+/// - `rec_file` 换识别模型, 也就是换识别语言; None = 用内置那个中英混排的。
+///   给的是 `model_dir` 里的文件名, 哪个语言对哪个文件由 Dart 那侧的语言表
+///   说了算 —— 下载地址也在那边, 这里不该也存一份
 #[allow(clippy::too_many_arguments)]
 pub fn convert_images(
     model_dir: String,
@@ -70,6 +73,7 @@ pub fn convert_images(
     format: OutFormat,
     long_edge: u32,
     low_memory: bool,
+    rec_file: Option<String>,
     sink: StreamSink<Progress>,
 ) -> Result<()> {
     let report = convert_inner(
@@ -80,6 +84,7 @@ pub fn convert_images(
         format,
         long_edge,
         low_memory,
+        rec_file,
         &mut |p| {
             let _ = sink.add(p);
         },
@@ -90,8 +95,8 @@ pub fn convert_images(
 
 /// 给 examples / 集成测试用的直通口子: 按手机上那套默认参数跑一遍, 出 docx
 ///
-/// 单独开一个而不是把 convert_inner 设成 pub, 是因为 convert_inner 的八个
-/// 参数里有一半在验证时永远是同一个值, 每次都抄一遍容易抄错。
+/// 单独开一个而不是把 convert_inner 设成 pub, 是因为 convert_inner 的九个
+/// 参数里有一多半在验证时永远是同一个值, 每次都抄一遍容易抄错。
 #[doc(hidden)]
 pub fn convert_for_test(
     model_dir: &str,
@@ -107,6 +112,7 @@ pub fn convert_for_test(
         OutFormat::Docx,
         2560,
         true,
+        None,
         &mut |p| println!("  {p:?}"),
     )
 }
@@ -124,6 +130,7 @@ fn convert_inner(
     format: OutFormat,
     long_edge: u32,
     low_memory: bool,
+    rec_file: Option<String>,
     on: &mut dyn FnMut(Progress),
 ) -> Result<ConvertReport> {
     if images.is_empty() {
@@ -142,10 +149,13 @@ fn convert_inner(
     };
 
     on(Progress::Loading);
-    let opts = if low_memory {
-        EngineOptions::low_memory()
-    } else {
-        EngineOptions::default()
+    let opts = EngineOptions {
+        rec_file,
+        ..if low_memory {
+            EngineOptions::low_memory()
+        } else {
+            EngineOptions::default()
+        }
     };
     let mut engine = Engine::load_with(Path::new(model_dir), opts).context("加载模型")?;
 

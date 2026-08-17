@@ -63,6 +63,19 @@ Future<void> askLanguage(BuildContext context) async {
   );
 }
 
+/// 某个语言自己怎么称呼自己; null(跟随系统)或者认不出来时返回 null
+///
+/// 给设置页那行副标题用 —— 那行要显示的是"现在是哪种语言", 跟列表里写的
+/// 必须是同一个词
+String? localeName(Locale? loc) {
+  if (loc == null) return null;
+  final k = _key(loc);
+  for (final (l, name) in _langs) {
+    if (_key(l) == k) return name;
+  }
+  return null;
+}
+
 /// 拿字符串当选中判据而不是 Locale 本身
 ///
 /// `Locale('zh')` 和 `Locale.fromSubtags(languageCode: 'zh')` 相等, 但

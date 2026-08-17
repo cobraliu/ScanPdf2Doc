@@ -100,6 +100,13 @@ class Settings {
   /// 而 MaterialApp 在首页的上面 —— 首页 setState 到不了它。
   static final locale = ValueNotifier<Locale?>(null);
 
+  /// 识别语言, 存的是 [OcrLang.code]; 空串 = 内置那个中英混排的
+  ///
+  /// 跟界面语言是两件事, 所以分开存: 一个韩国用户可能把界面设成韩语, 却
+  /// 整天在扫中文合同。也用 ValueNotifier —— 设置页改完之后, 上一层那行
+  /// "当前: 韩语"要跟着变。
+  static final ocrLang = ValueNotifier<String>('');
+
   static Future<File> _file() async {
     final base = await getApplicationSupportDirectory();
     return File('${base.path}/settings.json');
@@ -116,6 +123,8 @@ class Settings {
       if (p is Map) _pdf = PdfOpts.fromJson(p.cast<String, dynamic>());
       final t = m['locale'];
       if (t is String && t.isNotEmpty) locale.value = _parse(t);
+      final o = m['ocrLang'];
+      if (o is String) ocrLang.value = o;
     } catch (_) {
       // 文件坏了就当没设置过 —— 一个读不出来的配置不该让人导不了 PDF
     }
@@ -134,6 +143,12 @@ class Settings {
     await _save();
   }
 
+  /// 空串 = 内置那个
+  static Future<void> setOcrLang(String v) async {
+    ocrLang.value = v;
+    await _save();
+  }
+
   static Future<void> _save() async {
     try {
       final f = await _file();
@@ -142,6 +157,7 @@ class Settings {
           jsonEncode({
             'pdf': _pdf.toJson(),
             'locale': _tag(locale.value),
+            'ocrLang': ocrLang.value,
           }),
           flush: true);
       await t.rename(f.path);
