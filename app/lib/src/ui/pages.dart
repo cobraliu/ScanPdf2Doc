@@ -371,7 +371,11 @@ class _DocPageState extends State<DocPage> {
   /// 失败强
   Future<List<List<Map<String, Object>>>> _textLayer(
       L l, List<String> paths) async {
-    final ocr = await Models.setup();
+    final pack = Models.current.name(l);
+    final ocr = await Models.prepare(
+      onDownload: (p) =>
+          _progress(l.ocrDownloadingPack(pack, (p * 100).round())),
+    );
     var out = <List<Map<String, Object>>>[];
     await for (final p in ocrImages(
       modelDir: ocr.dir,

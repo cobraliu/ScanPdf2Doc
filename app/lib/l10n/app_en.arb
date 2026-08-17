@@ -456,7 +456,7 @@
   "ocrLangDeleteBody": "You can download it again any time.",
   "ocrLangFailed": "Download failed: {detail}",
   "@ocrLangFailed": {
-    "description": "Snackbar when a language pack download fails; detail already went through humanError().",
+    "description": "Snackbar when a language pack download fails on the picker screen; detail is the raw error.",
     "placeholders": {
       "detail": {
         "type": "String"
@@ -468,6 +468,30 @@
     "description": "Snackbar right after a pack finishes downloading and is switched to automatically.",
     "placeholders": {
       "name": {
+        "type": "String"
+      }
+    }
+  },
+  "ocrDownloadingPack": "Downloading {name} pack… {percent}%",
+  "@ocrDownloadingPack": {
+    "description": "Progress line while a language pack is being fetched, shown on the convert/text screens before recognition starts.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ocrPackFailed": "Couldn’t download the {name} pack: {detail}",
+  "@ocrPackFailed": {
+    "description": "The selected language pack is neither installed nor downloadable, so recognition cannot start. detail is the raw error.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "detail": {
         "type": "String"
       }
     }

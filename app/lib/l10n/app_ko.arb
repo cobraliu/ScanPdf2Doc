@@ -168,5 +168,7 @@
   "ocrLangDeleteTitle": "{name} 팩을 삭제할까요?",
   "ocrLangDeleteBody": "언제든 다시 받을 수 있습니다.",
   "ocrLangFailed": "다운로드 실패: {detail}",
-  "ocrLangSwitched": "이제 {name}(으)로 인식합니다"
+  "ocrLangSwitched": "이제 {name}(으)로 인식합니다",
+  "ocrDownloadingPack": "{name} 언어 팩 다운로드 중 {percent}%",
+  "ocrPackFailed": "{name} 언어 팩을 내려받지 못했습니다: {detail}"
 }

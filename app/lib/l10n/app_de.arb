@@ -168,5 +168,7 @@
   "ocrLangDeleteTitle": "Paket {name} löschen?",
   "ocrLangDeleteBody": "Du kannst es jederzeit wieder laden.",
   "ocrLangFailed": "Download fehlgeschlagen: {detail}",
-  "ocrLangSwitched": "Erkennt jetzt {name}"
+  "ocrLangSwitched": "Erkennt jetzt {name}",
+  "ocrDownloadingPack": "{name}-Paket wird geladen … {percent} %",
+  "ocrPackFailed": "Das {name}-Paket konnte nicht geladen werden: {detail}"
 }

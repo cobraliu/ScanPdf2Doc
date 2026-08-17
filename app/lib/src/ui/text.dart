@@ -13,7 +13,7 @@ import 'errors.dart';
 import 'theme.dart';
 
 /// 跑到哪一步了。存这个而不是存拼好的那句话 —— 那句要在 build 里翻
-enum _Stage { prep, loading, page }
+enum _Stage { prep, downloading, loading, page }
 
 /// 提取文字: 把每一页认出来的字摊开, 能看、能选、能复制、能导成 txt
 ///
@@ -38,6 +38,8 @@ class _TextPageState extends State<TextPage> {
   _Stage? _stage;
   int _at = 0, _of = 0;
   double? _frac;
+  /// 正在下的那个语言包叫什么; 只在 _Stage.downloading 时有意义
+  String _pack = '';
   Object? _error;
 
   /// 每页一段文字, 页序跟传进来的一致; null 表示还没跑
@@ -51,6 +53,16 @@ class _TextPageState extends State<TextPage> {
     _run();
   }
 
+  /// 语言包的名字要走 L, 而 L 在 initState 里还够不着(它是 InheritedWidget)
+  ///
+  /// 放这儿正好: initState 里的 _run() 一进 await 就把控制权交回来了, 这个
+  /// 回调跑在那之后、第一次 build 之前, 等下载进度真的开始报时它已经填好了
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pack = Models.current.name(L.of(context));
+  }
+
   Future<void> _run() async {
     if (_running) return;
     setState(() {
@@ -61,7 +73,13 @@ class _TextPageState extends State<TextPage> {
       _frac = null;
     });
     try {
-      final ocr = await Models.setup();
+      final ocr = await Models.prepare(onDownload: (p) {
+        if (!mounted) return;
+        setState(() {
+          _stage = _Stage.downloading;
+          _frac = p;
+        });
+      });
       await for (final p in ocrImages(
         modelDir: ocr.dir,
         images: widget.pages,
@@ -187,6 +205,8 @@ class _TextPageState extends State<TextPage> {
             const SizedBox(height: Ui.gap),
             Text(switch (_stage) {
               _Stage.prep => l.convertPreparing,
+              _Stage.downloading =>
+                l.ocrDownloadingPack(_pack, ((_frac ?? 0) * 100).round()),
               _Stage.loading => l.convertLoading,
               _Stage.page => l.convertPageOf(_at, _of),
               null => '',

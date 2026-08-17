@@ -168,5 +168,7 @@
   "ocrLangDeleteTitle": "{name}のパックを削除しますか？",
   "ocrLangDeleteBody": "いつでもまたダウンロードできます。",
   "ocrLangFailed": "ダウンロードに失敗しました：{detail}",
-  "ocrLangSwitched": "{name}で認識します"
+  "ocrLangSwitched": "{name}で認識します",
+  "ocrDownloadingPack": "{name}の言語パックをダウンロード中 {percent}%",
+  "ocrPackFailed": "{name}の言語パックをダウンロードできませんでした：{detail}"
 }

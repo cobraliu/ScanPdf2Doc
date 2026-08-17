@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart' show PlatformException;
 
 import '../../l10n/l10n.dart';
+import '../models.dart' show OcrPackMissing;
 
 /// 把一个异常翻成给用户看的一句话
 ///
@@ -16,5 +17,8 @@ import '../../l10n/l10n.dart';
 ///   而不是界面卡住了; 截图发过来我们也还认得出是哪一条。
 String humanError(L l, Object e) {
   if (e is PlatformException && e.code == 'os_too_old') return l.enhanceTooOld;
+  // 语言包下不下来。这一条一定要说清是哪种语言 —— 用户能自己判断"那我先
+  // 换回内置的把这份先转了", 而一句笼统的"出错了"只会让人以为识别坏了
+  if (e is OcrPackMissing) return l.ocrPackFailed(e.lang.name(l), '${e.cause}');
   return l.errorGeneric('$e');
 }

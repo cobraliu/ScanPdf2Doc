@@ -168,5 +168,7 @@
   "ocrLangDeleteTitle": "¿Eliminar el paquete {name}?",
   "ocrLangDeleteBody": "Puedes volver a descargarlo cuando quieras.",
   "ocrLangFailed": "Error al descargar: {detail}",
-  "ocrLangSwitched": "Ahora se reconoce {name}"
+  "ocrLangSwitched": "Ahora se reconoce {name}",
+  "ocrDownloadingPack": "Descargando el paquete de {name}… {percent} %",
+  "ocrPackFailed": "No se pudo descargar el paquete de {name}: {detail}"
 }

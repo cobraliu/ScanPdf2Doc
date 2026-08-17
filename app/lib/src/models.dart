@@ -42,13 +42,8 @@ class OcrLang {
 
   bool get builtin => remote == null;
 
-  /// 下载地址
-  ///
-  /// 钉死在 v3.9.2 这个 tag 上, 不用 master —— 上游哪天换了模型, 我们这边
-  /// 的 sha256 会全部对不上, 而那时候用户看到的只是"下载失败", 查起来很远。
-  /// 钉住之后上游怎么动都跟已经装出去的版本无关。
-  String get url => 'https://www.modelscope.cn/models/RapidAI/RapidOCR'
-      '/resolve/v3.9.2/onnx/$remote';
+  /// 按 [_mirrors] 的顺序排出来的下载地址, 挨个试
+  List<String> get urls => [for (final m in _mirrors) '$m$remote'];
 
   /// 界面上叫什么
   ///
@@ -77,6 +72,25 @@ class OcrLang {
   /// "13.5 MB"
   String get size => '${(bytes / 1000000).toStringAsFixed(1)} MB';
 }
+
+/// 语言包从哪儿下, 按顺序试, 第一个下成的算数
+///
+/// 地址钉死在 RapidOCR 的 `v3.9.2` 这个 tag 上, 不用 master —— 上游哪天换了
+/// 模型, 我们这边的 sha256 会全部对不上, 而那时候用户看到的只是"下载失败",
+/// 查起来很远。钉住之后上游怎么动都跟已经装出去的版本无关。
+///
+/// **眼下只有一个源。** 找过 HuggingFace: 官方的 `PaddlePaddle/*_PP-OCRv5_
+/// mobile_rec` 放的是 Paddle 格式(`.pdiparams`), 不是 ONNX; `SWHL/RapidOCR`
+/// 只到 v4 而且只有中英两个模型; HF 上没有 RapidAI 的镜像; RapidOCR 的
+/// GitHub Release 一个附件都没挂。也就是说, 带内嵌字表的这批 ONNX 目前只有
+/// ModelScope 一家在发。ModelScope 的 CDN 直链倒是能拿到, 但那个地址带
+/// `auth_key` 会过期, 写死没用。
+///
+/// 所以这里做成一张表而不是一个常量: 哪天我们自己往别处传一份(GitHub
+/// Release 或者一个 HF 仓库), 加一行就完事, 下载那侧一个字都不用动。
+const _mirrors = <String>[
+  'https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/',
+];
 
 /// 内置的那套 + 能下的那几个
 ///
@@ -145,6 +159,23 @@ const _langs = <OcrLang>[
   ),
 ];
 
+/// 选了某种识别语言, 但那个包既不在本地也下不下来
+///
+/// 单独一个类型而不是一句字符串, 是为了让 [humanError] 能说出**是哪种语言**
+/// 下不下来 —— 用户看到"韩语包下不下来"才知道该去哪儿看, 看到"出错了"只能
+/// 猜是识别坏了。
+class OcrPackMissing implements Exception {
+  const OcrPackMissing(this.lang, this.cause);
+
+  final OcrLang lang;
+
+  /// 原始的那个错(超时、DNS、校验不过...), 附在提示后面留给截图排查
+  final Object cause;
+
+  @override
+  String toString() => '${lang.file} 下不下来: $cause';
+}
+
 /// 这次识别用哪个目录、哪个 rec 文件
 ///
 /// 三个调用点(转文档、提取文字、可搜索 PDF)拿到的必须是同一个答案 ——
@@ -177,6 +208,12 @@ class Models {
 
   static OcrLang byCode(String code) =>
       _langs.firstWhere((e) => e.code == code, orElse: () => _langs.first);
+
+  /// 眼下选中的识别语言
+  ///
+  /// 有这个 getter, 三个识别页面就不用各自 import settings 再自己查一遍表 ——
+  /// 它们要的只是"现在这份要按哪种语言认", 不是"设置里存的是什么"
+  static OcrLang get current => byCode(Settings.ocrLang.value);
 
   /// 模型目录, 只保证目录在, 不管里面有什么
   ///
@@ -221,21 +258,37 @@ class Models {
     return await f.exists() && await f.length() == lang.bytes;
   }
 
-  /// 识别该按哪个语言跑
+  /// 备好这次识别要用的模型: 选的语言包不在就现下, 进度走 [onDownload]
   ///
-  /// 选的包要是不在了就退回内置 —— 这不是假想的情况: 模型目录被我们标成了
-  /// 不备份, 所以从 iCloud 恢复出来的新设备上, 设置里写着"韩语"而文件是没有
-  /// 的。那时候用内置的认一遍(认出来的字不对)也好过直接报错跑不动。
-  static Future<OcrSetup> setup() async {
+  /// 包缺了是会真发生的, 不是假想: 模型目录被我们标成了不备份, 所以从 iCloud
+  /// 恢复出来的新设备上, 设置里写着"韩语"而文件是没有的; 用户也可能在设置页
+  /// 之外把它删掉。
+  ///
+  /// 缺了就现下, 而不是退回内置。退回内置在这里是最坏的一种处理: 韩文页用中文
+  /// 模型认一遍, 出来的不是"没结果", 是一整页**看着像结果的错字** —— 用户拿到
+  /// 一份 Word 才发现不对, 而那时候已经没有任何线索指向"语言包没装上"。宁可
+  /// 当场说一句"下不下来", 也不要交一份安静的错东西。
+  ///
+  /// 下载失败抛 [OcrPackMissing]; 上层拿它翻成人话(见 ui/errors.dart)。
+  static Future<OcrSetup> prepare({void Function(double)? onDownload}) async {
     final dir = await ensure();
-    final lang = byCode(Settings.ocrLang.value);
+    final lang = current;
     if (lang.builtin) return OcrSetup(dir, null);
-    return await installed(lang)
-        ? OcrSetup(dir, lang.file)
-        : OcrSetup(dir, null);
+    if (await installed(lang)) return OcrSetup(dir, lang.file);
+    try {
+      await for (final p in download(lang)) {
+        onDownload?.call(p);
+      }
+    } catch (e) {
+      throw OcrPackMissing(lang, e);
+    }
+    return OcrSetup(dir, lang.file);
   }
 
   /// 下载一个语言包, 边下边报进度(0..1)
+  ///
+  /// 挨个源试, 第一个下成的就算数。全都不成就把最后一次的错抛出去 ——
+  /// 抛第一次的没有意义: 用户真正卡在哪一步, 看的是最后那次。
   ///
   /// 先下到 `.part` 再改名: 下到一半被杀掉的话, 留在磁盘上的是个 .part,
   /// 而不是一个大小对不上的模型文件 —— 后者会被下一次 [installed] 当成
@@ -244,13 +297,30 @@ class Models {
     final dir = await _path();
     final dst = File('$dir/${lang.file}');
     final part = File('${dst.path}.part');
+    final urls = lang.urls;
 
+    for (final (i, url) in urls.indexed) {
+      try {
+        yield* _fetch(url, lang, part);
+        await part.rename(dst.path);
+        return;
+      } catch (e) {
+        // 换下一个源之前先把这次的残骸清掉, 不然下一个源接着往同一个
+        // .part 上写(openWrite 会截断, 但万一没走到那一步)
+        if (await part.exists()) await part.delete();
+        if (i == urls.length - 1) rethrow;
+      }
+    }
+  }
+
+  /// 从一个具体地址下到 [part], 校验字节数和 sha256; 不改名
+  static Stream<double> _fetch(String url, OcrLang lang, File part) async* {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 20);
     try {
-      final res = await client.getUrl(Uri.parse(lang.url)).then((r) => r.close());
+      final res = await client.getUrl(Uri.parse(url)).then((r) => r.close());
       if (res.statusCode != 200) {
-        throw HttpException('HTTP ${res.statusCode}', uri: Uri.parse(lang.url));
+        throw HttpException('HTTP ${res.statusCode}', uri: Uri.parse(url));
       }
       final sink = part.openWrite();
       var got = 0;
@@ -273,18 +343,15 @@ class Models {
 
       final n = await part.length();
       if (n != lang.bytes) {
-        await part.delete();
         throw HttpException('下载不完整: $n / ${lang.bytes} 字节');
       }
       // 校验哈希。HTTPS 加上字节数对得上, 已经挡掉了绝大多数情况; 留这一道
       // 是因为剩下那种最难查 —— 一个内容不对的模型不会报错, 它照样跑, 只是
-      // 认出来的每个字都是错的
+      // 认出来的每个字都是错的。多源之后这一道更要紧: 镜像未必跟主源同步
       final h = sha256.convert(await part.readAsBytes()).toString();
       if (h != lang.sha) {
-        await part.delete();
         throw HttpException('文件校验不过: $h');
       }
-      await part.rename(dst.path);
     } finally {
       client.close(force: true);
     }
@@ -298,8 +365,8 @@ class Models {
       final f = File(p);
       if (await f.exists()) await f.delete();
     }
-    // 正在用的那个被删了就退回内置, 不然下次识别会走 setup() 的兜底 ——
-    // 兜底是给意外准备的, 用户明说要删的时候该当场把设置改对
+    // 正在用的那个被删了就退回内置。不改的话, 设置里还写着"韩语"而文件没了,
+    // 下次识别会当场去重下一遍 —— 用户刚刚明确表达的是"我不要它了"
     if (Settings.ocrLang.value == lang.code) await Settings.setOcrLang('');
   }
 }

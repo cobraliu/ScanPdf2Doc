@@ -15,7 +15,7 @@ import 'theme.dart';
 ///
 /// 存这个而不是存一句拼好的话: 那句话要在 build 里翻, 存成文本的话界面语言
 /// 换了它还是旧的那种语言
-enum _Stage { prep, loading, page, writing }
+enum _Stage { prep, downloading, loading, page, writing }
 
 /// 识别页: 选格式 -> 跑 Rust -> 出文件
 ///
@@ -41,6 +41,8 @@ class _ConvertPageState extends State<ConvertPage> {
   _Stage? _stage;
   int _at = 0, _of = 0;
   double? _frac;
+  /// 正在下的那个语言包叫什么; 只在 _Stage.downloading 时有意义
+  String _pack = '';
   ConvertReport? _done;
   Object? _error;
 
@@ -61,16 +63,25 @@ class _ConvertPageState extends State<ConvertPage> {
   }
 
   Future<void> _run() async {
-    final fallback = L.of(context).commonDefaultDocName(stamp());
+    final l = L.of(context);
+    final fallback = l.commonDefaultDocName(stamp());
     setState(() {
       _running = true;
       _error = null;
       _done = null;
       _stage = _Stage.prep;
       _frac = null;
+      // 现在取而不是下载回调里取: 回调在 await 之后, 那时 context 未必还在
+      _pack = Models.current.name(l);
     });
     try {
-      final ocr = await Models.setup();
+      final ocr = await Models.prepare(onDownload: (p) {
+        if (!mounted) return;
+        setState(() {
+          _stage = _Stage.downloading;
+          _frac = p;
+        });
+      });
       final base = await getApplicationDocumentsDirectory();
       final outDir = '${base.path}/out';
 
@@ -193,6 +204,8 @@ class _ConvertPageState extends State<ConvertPage> {
 
   String _stageText(L l) => switch (_stage) {
         _Stage.prep => l.convertPreparing,
+        _Stage.downloading =>
+          l.ocrDownloadingPack(_pack, ((_frac ?? 0) * 100).round()),
         _Stage.loading => l.convertLoading,
         _Stage.page => l.convertPageOf(_at, _of),
         _Stage.writing => l.convertWriting,

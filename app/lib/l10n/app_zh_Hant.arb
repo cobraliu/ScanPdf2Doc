@@ -168,5 +168,7 @@
   "ocrLangDeleteTitle": "刪除{name}語言包？",
   "ocrLangDeleteBody": "隨時可以重新下載。",
   "ocrLangFailed": "下載失敗：{detail}",
-  "ocrLangSwitched": "辨識語言已改成{name}"
+  "ocrLangSwitched": "辨識語言已改成{name}",
+  "ocrDownloadingPack": "正在下載{name}語言包 {percent}%",
+  "ocrPackFailed": "{name}語言包下載不了：{detail}"
 }
