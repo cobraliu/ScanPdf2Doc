@@ -74,6 +74,19 @@ class Native {
     return r ?? out;
   }
 
+  /// 增强一页, 结果写到 out
+  ///
+  /// mode 是 `Enhance.id`: auto / light / gray / bw。跟旋转不同, 这一步一定会
+  /// 重新编码 —— 像素本身变了, 没有无损的路可走
+  static Future<String> enhancePage(String path, String out, String mode) async {
+    final r = await _ch.invokeMethod<String>('enhancePage', {
+      'path': path,
+      'out': out,
+      'mode': mode,
+    });
+    return r ?? out;
+  }
+
   /// 把一组页图拼成 PDF, 返回 out
   ///
   /// - [opts] 决定纸张、页边距和图的压缩程度, 见 [PdfOpts]

@@ -100,6 +100,16 @@ class DocScanner: NSObject {
                 return
             }
             offload(result) { try Self.crop(path: path, out: out, corners: c) }
+        case "enhancePage":
+            guard let a = call.arguments as? [String: Any],
+                  let path = a["path"] as? String,
+                  let out = a["out"] as? String,
+                  let mode = a["mode"] as? String
+            else {
+                result(FlutterError(code: "args", message: "enhancePage 参数不对", details: nil))
+                return
+            }
+            offload(result) { try Self.enhance(path: path, out: out, mode: mode) }
         case "pickPdf":
             pickPdf(result)
         case "pdfPages":
@@ -243,6 +253,71 @@ class DocScanner: NSObject {
             throw Err("这四个角框不出一块区域")
         }
         try write(o, to: out)
+        return out
+    }
+
+    /// 增强一页, 写到 out
+    ///
+    /// - `auto`  文档增强: 摊平底色、去掉阴影, 颜色留着
+    /// - `light` 只提一点亮度和对比度, 最接近原样
+    /// - `gray`  去色
+    /// - `bw`    去色 + 硬对比, 字黑纸白
+    ///
+    /// 没做真正的二值化(逐像素卡一个阈值)。`CIColorThreshold` 要 iOS 17, 而且
+    /// 卡出来的字边缘是硬锯齿, 缩进 PDF 里比现在更糊 —— 拉高对比度留一条很窄
+    /// 的过渡带, 看着一样是黑白, 小字反而清楚。
+    ///
+    /// bw 那组数字(对比度 2.4)是估的, 得在真机上对着一张拍歪的合同看一眼再定。
+    /// CIColorControls 是在 CIContext 的线性工作空间里算的, 中点 0.5 线性 ≈
+    /// sRGB 的 0.72 —— 也就是说阈值偏暗, 全靠前面那步文档增强先把纸压白。
+    private static func enhance(path: String, out: String, mode: String) throws -> String {
+        guard let ci = CIImage(contentsOf: URL(fileURLWithPath: path),
+                               options: [.applyOrientationProperty: true])
+        else { throw Err("这张图打不开") }
+        var img = ci
+
+        // auto 和 bw 都先过一遍文档增强。手机拍的纸十有八九一半亮一半暗,
+        // 不先把底色摊平, 后面不管提亮还是加对比, 暗的那半边都会糊成一片
+        if mode == "auto" || mode == "bw" {
+            // 用字符串查而不是 CIFilter.documentEnhancer(): 这个滤镜要 iOS 16,
+            // 而部署目标是 15。查不到就是 nil, 不用 #available 分叉。
+            //
+            // 强度用默认的 1.0, 不去 setValue("inputAmount"): CIFilter 的 KVC
+            // 撞上不认识的键是抛 NSUnknownKeyException —— Swift 接不住,
+            // 直接闪退。为一个本来就等于默认值的参数冒这个险不值
+            if let f = CIFilter(name: "CIDocumentEnhancer") {
+                f.setValue(img, forKey: kCIInputImageKey)
+                if let o = f.outputImage { img = o }
+            }
+        }
+
+        var s = 1.0, b = 0.0, c = 1.0
+        switch mode {
+        case "auto":
+            break  // 文档增强自己就够了, 再补一道调色是过头
+        case "light":
+            (s, b, c) = (1.05, 0.10, 1.10)
+        case "gray":
+            (s, b, c) = (0.00, 0.00, 1.05)
+        case "bw":
+            (s, b, c) = (0.00, 0.08, 2.40)
+        default:
+            throw Err("不认识的增强方式: \(mode)")
+        }
+        if s != 1.0 || b != 0.0 || c != 1.0 {
+            guard let f = CIFilter(name: "CIColorControls") else { throw Err("系统不支持调色") }
+            f.setValue(img, forKey: kCIInputImageKey)
+            f.setValue(s, forKey: kCIInputSaturationKey)
+            f.setValue(b, forKey: kCIInputBrightnessKey)
+            f.setValue(c, forKey: kCIInputContrastKey)
+            guard let o = f.outputImage else { throw Err("调色没出图") }
+            img = o
+        }
+
+        // 一个滤镜都没跑到还照抄一份出去, 是骗人: 那一页会被标成"已编辑"、
+        // 「还原」按钮也亮起来, 而画面一点没变。iOS 15 上的 auto 就是这种情况
+        if img === ci { throw Err("这台设备的系统太老，用不了自动增强（要 iOS 16）") }
+        try write(img, to: out)
         return out
     }
 

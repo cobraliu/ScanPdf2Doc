@@ -7,9 +7,10 @@ import 'package:flutter/services.dart';
 
 import '../doc.dart';
 import '../native.dart';
+import 'enhance.dart';
 import 'theme.dart';
 
-/// 单页编辑: 转 90° / 拖四个角重裁 / 退回原图
+/// 单页编辑: 增强 / 转 90° / 拖四个角重裁 / 退回原图
 ///
 /// 拖角这件事在屏幕坐标里做, 提交时归一化成 [0,1] 交给原生 —— 界面按什么尺寸
 /// 显示、图本身几千像素, 两边都不用知道对方的事。
@@ -87,6 +88,18 @@ class _EditPageState extends State<EditPage> {
         final src = _doc.pagePath(_i);
         await HapticFeedback.selectionClick();
         await _doc.replacePage(_i, (out) => Native.rotatePage(src, out, turns));
+        await _measure();
+        if (mounted) setState(() {});
+      });
+
+  /// 增强这一页
+  ///
+  /// 跟旋转、裁切走同一条路 —— 换成一张新文件, 老的那张进 origins 留着。
+  /// 也就是说滤镜可以随便试: 试歪了点「还原」, 退回来的一直是最早那张原图
+  Future<void> _enhance(Enhance e) => _guard(() async {
+        final src = _doc.pagePath(_i);
+        await HapticFeedback.selectionClick();
+        await _doc.replacePage(_i, (out) => Native.enhancePage(src, out, e.id));
         await _measure();
         if (mounted) setState(() {});
       });
@@ -234,10 +247,51 @@ class _EditPageState extends State<EditPage> {
     );
   }
 
+  /// 一排增强按钮
+  ///
+  /// 摆在这儿而不是收进菜单: 一张手机拍的合同该用哪档, 说不清, 只能点一下看
+  /// 一眼。收进菜单的话每试一次要"点开-选-看-点开-选", 摊在外面就是点一下。
+  /// 反正每一下都可撤(见 [_enhance])。
+  Widget _filters() {
+    return SizedBox(
+      height: 48,
+      // 横着滑而不是 Wrap: 375 点的小屏加上放到最大的动态字号, 四个词能撑到
+      // 换行, 换了行整个底栏就往上蹿一截, 画布跟着跳
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: Enhance.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: Ui.gapSm),
+        itemBuilder: (_, i) {
+          final e = Enhance.values[i];
+          return Center(
+            child: ActionChip(
+              avatar: Icon(e.icon, size: 18),
+              label: Text(e.label),
+              tooltip: e.hint,
+              onPressed: _busy ? null : () => _enhance(e),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _bar() {
     return SafeArea(
       top: false,
-      child: Padding(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_cropping) _filters(),
+          _tools(),
+        ],
+      ),
+    );
+  }
+
+  Widget _tools() {
+    return Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: _cropping
             ? Row(
@@ -290,9 +344,7 @@ class _EditPageState extends State<EditPage> {
                     ),
                   ),
                 ],
-              ),
-      ),
-    );
+              ));
   }
 
   /// 四个角围出来的东西还算个四边形吗
