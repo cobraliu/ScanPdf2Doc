@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "ai.insnap.scanpdf2doc"
+    namespace = "site.aliyeye.scanpdf2doc"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "ai.insnap.scanpdf2doc"
+        applicationId = "site.aliyeye.scanpdf2doc"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -1,4 +1,4 @@
-package ai.insnap.scanpdf2doc
+package site.aliyeye.scanpdf2doc
 
 import io.flutter.embedding.android.FlutterActivity
 
