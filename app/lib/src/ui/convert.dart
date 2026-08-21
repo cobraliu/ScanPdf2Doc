@@ -10,6 +10,7 @@ import '../models.dart';
 import '../rust/api/convert.dart';
 import 'errors.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 跑到哪一步了
 ///
@@ -138,11 +139,13 @@ class _ConvertPageState extends State<ConvertPage> {
   Widget build(BuildContext context) {
     final l = L.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l.convertTitle),
-        // 跑的时候不让返回: Rust 侧没有中断口子, 界面退了它还在后台算,
-        // 不如老老实实等着
-        automaticallyImplyLeading: !_running,
+      appBar: SysBar(
+        AppBar(
+          title: Text(l.convertTitle),
+          // 跑的时候不让返回: Rust 侧没有中断口子, 界面退了它还在后台算,
+          // 不如老老实实等着
+          automaticallyImplyLeading: !_running,
+        ),
       ),
       body: Readable(
           child: ListView(

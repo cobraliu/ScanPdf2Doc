@@ -6,6 +6,7 @@ import 'src/rust/frb_generated.dart';
 import 'src/settings.dart';
 import 'src/ui/home.dart';
 import 'src/ui/theme.dart';
+import 'src/ui/window_controls.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,9 @@ class App extends StatelessWidget {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: L.supportedLocales,
+        // 挂在 builder 上而不是套在 home 外面: 这一层要盖住 Navigator, 后面
+        // push 出来的页(页列表、单页编辑…)才找得到它
+        builder: (_, child) => WindowControls(child: child!),
         home: const HomePage(),
       ),
     );

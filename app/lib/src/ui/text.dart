@@ -11,6 +11,7 @@ import '../models.dart';
 import '../rust/api/textlayer.dart';
 import 'errors.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 跑到哪一步了。存这个而不是存拼好的那句话 —— 那句要在 build 里翻
 enum _Stage { prep, downloading, loading, page }
@@ -162,24 +163,26 @@ class _TextPageState extends State<TextPage> {
     final done = _out != null;
     final all = done ? _allText(l) : '';
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l.textTitle),
-        // 跑的时候不让退: Rust 那侧没有中断的口子, 界面退了它还在后台算
-        automaticallyImplyLeading: !_running,
-        actions: [
-          if (all.trim().isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.copy_all_outlined),
-              tooltip: l.textCopyAll,
-              onPressed: () => _copy(all, l.textAll),
-            ),
-            IconButton(
-              icon: const Icon(Icons.ios_share),
-              tooltip: l.textExportTxt,
-              onPressed: _exportTxt,
-            ),
+      appBar: SysBar(
+        AppBar(
+          title: Text(l.textTitle),
+          // 跑的时候不让退: Rust 那侧没有中断的口子, 界面退了它还在后台算
+          automaticallyImplyLeading: !_running,
+          actions: [
+            if (all.trim().isNotEmpty) ...[
+              IconButton(
+                icon: const Icon(Icons.copy_all_outlined),
+                tooltip: l.textCopyAll,
+                onPressed: () => _copy(all, l.textAll),
+              ),
+              IconButton(
+                icon: const Icon(Icons.ios_share),
+                tooltip: l.textExportTxt,
+                onPressed: _exportTxt,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       body: Readable(child: _body(l)),
     );

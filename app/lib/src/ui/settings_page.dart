@@ -6,6 +6,7 @@ import '../settings.dart';
 import 'language.dart';
 import 'ocr_lang.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 设置
 ///
@@ -19,7 +20,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = L.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l.settingsTitle)),
+      appBar: SysBar(AppBar(title: Text(l.settingsTitle))),
       body: Readable(
         child: ListView(
           children: [

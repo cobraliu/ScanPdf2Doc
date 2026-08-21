@@ -18,6 +18,7 @@ import 'errors.dart';
 import 'export_sheet.dart';
 import 'text.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 一个文档里的那一摞页
 ///
@@ -463,7 +464,7 @@ class _DocPageState extends State<DocPage> {
 
   Widget _scaffold(L l, int n) {
     return Scaffold(
-      appBar: _selecting ? _selectBar(l) : _titleBar(l, n),
+      appBar: SysBar(_selecting ? _selectBar(l) : _titleBar(l, n)),
       body: Stack(
         children: [
           n == 0

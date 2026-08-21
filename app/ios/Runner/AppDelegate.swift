@@ -6,6 +6,7 @@ import UIKit
     /// 存成字段是必须的: 只是 new 出来的话它立刻被释放, MethodChannel 跟着没,
     /// Dart 那边的调用就石沉大海
     private var scanner: DocScanner?
+    private var windowControls: WindowControls?
 
     override func application(
         _ application: UIApplication,
@@ -19,6 +20,8 @@ import UIKit
     /// AppDelegate 手上也不再有 window 了(窗口归 SceneDelegate)
     func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
         GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-        scanner = DocScanner(messenger: engineBridge.applicationRegistrar.messenger())
+        let messenger = engineBridge.applicationRegistrar.messenger()
+        scanner = DocScanner(messenger: messenger)
+        windowControls = WindowControls(messenger: messenger)
     }
 }

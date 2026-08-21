@@ -6,6 +6,7 @@ import '../../l10n/l10n.dart';
 import '../models.dart';
 import '../settings.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 挑识别语言, 顺带管语言包的下载和删除
 ///
@@ -122,7 +123,7 @@ class _OcrLangPageState extends State<OcrLangPage> {
   Widget build(BuildContext context) {
     final l = L.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l.settingsOcrLang)),
+      appBar: SysBar(AppBar(title: Text(l.settingsOcrLang))),
       body: Readable(
         child: ValueListenableBuilder<String>(
           valueListenable: Settings.ocrLang,

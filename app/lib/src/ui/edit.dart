@@ -11,6 +11,7 @@ import '../native.dart';
 import 'enhance.dart';
 import 'errors.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 单页编辑: 增强 / 转 90° / 拖四个角重裁 / 退回原图
 ///
@@ -140,16 +141,18 @@ class _EditPageState extends State<EditPage> {
         final t = Theme.of(ctx);
         return Scaffold(
           backgroundColor: t.colorScheme.surfaceContainerLowest,
-          appBar: AppBar(
-            title: Text(l.commonPageN(_i + 1)),
-            actions: [
-              if (_doc.hasOriginal(_i) && !_cropping)
-                TextButton.icon(
-                  onPressed: _busy ? null : _restore,
-                  icon: const Icon(Icons.restore, size: 18),
-                  label: Text(l.editRestore),
-                ),
-            ],
+          appBar: SysBar(
+            AppBar(
+              title: Text(l.commonPageN(_i + 1)),
+              actions: [
+                if (_doc.hasOriginal(_i) && !_cropping)
+                  TextButton.icon(
+                    onPressed: _busy ? null : _restore,
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: Text(l.editRestore),
+                  ),
+              ],
+            ),
           ),
           body: Column(
             children: [

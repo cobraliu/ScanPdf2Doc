@@ -7,6 +7,7 @@ import '../doc.dart';
 import 'settings_page.dart';
 import 'pages.dart';
 import 'theme.dart';
+import 'window_controls.dart';
 
 /// 文档列表 —— App 的首页
 ///
@@ -111,48 +112,50 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final l = L.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: _searching
-            ? TextField(
-                controller: _search,
-                autofocus: true,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: l.homeSearchHint,
-                  border: InputBorder.none,
-                  // 清空和退出搜索是两件事: 以前只有一个 X, 想重打一个词
-                  // 就得先退出搜索再点开
-                  suffixIcon: _q.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.cancel, size: 20),
-                          tooltip: l.commonClear,
-                          onPressed: () {
-                            _search.clear();
-                            setState(() => _q = '');
-                          },
-                        ),
-                ),
-                onChanged: (v) => setState(() => _q = v),
-              )
-            : const Text('ScanPdf2Doc'),
-        actions: [
-          IconButton(
-            icon: Icon(_searching ? Icons.close : Icons.search),
-            tooltip: _searching ? l.homeSearchClose : l.homeSearchOpen,
-            onPressed: () => setState(() {
-              _searching = !_searching;
-              _q = '';
-              _search.clear();
-            }),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: l.settingsTitle,
-            onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const SettingsPage())),
-          ),
-        ],
+      appBar: SysBar(
+        AppBar(
+          title: _searching
+              ? TextField(
+                  controller: _search,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: l.homeSearchHint,
+                    border: InputBorder.none,
+                    // 清空和退出搜索是两件事: 以前只有一个 X, 想重打一个词
+                    // 就得先退出搜索再点开
+                    suffixIcon: _q.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.cancel, size: 20),
+                            tooltip: l.commonClear,
+                            onPressed: () {
+                              _search.clear();
+                              setState(() => _q = '');
+                            },
+                          ),
+                  ),
+                  onChanged: (v) => setState(() => _q = v),
+                )
+              : const Text('ScanPdf2Doc'),
+          actions: [
+            IconButton(
+              icon: Icon(_searching ? Icons.close : Icons.search),
+              tooltip: _searching ? l.homeSearchClose : l.homeSearchOpen,
+              onPressed: () => setState(() {
+                _searching = !_searching;
+                _q = '';
+                _search.clear();
+              }),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: l.settingsTitle,
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const SettingsPage())),
+            ),
+          ],
+        ),
       ),
       body: _body(),
       floatingActionButton: FloatingActionButton.extended(
