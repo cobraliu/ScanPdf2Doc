@@ -39,6 +39,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- 出口合规: 只用了系统自带的 HTTPS(下语言包), 属于豁免范围。
+	     不写这条, 每传一个包上去 TestFlight 都要人工去后台勾一次"是否使用
+	     加密", 勾之前测试员根本收不到。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

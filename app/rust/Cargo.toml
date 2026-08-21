@@ -12,9 +12,11 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "staticlib", "lib"]
 
 [dependencies]
-# 识别与版面重建核心, 直接吃桌面版那个仓库的 v0.1.6
+# 识别与版面重建核心, 直接吃桌面版那个仓库
+# 钉在提交上而不是 tag: 中文首行缩进那个修复(段落被拆开、短尾行丢失、正文被当
+# 小标题加粗)在 v0.1.7 之后, 手机这侧要先吃到, 桌面版发不发下一个版本是另一回事
 # default-features = false 是关掉 gui: eframe/wgpu 那一坨在手机上一点用没有
-scannedpdf2doc = { git = "https://github.com/cobraliu/ScannedPdf2Doc-rust", tag = "v0.1.6", default-features = false }
+scannedpdf2doc = { git = "https://github.com/cobraliu/ScannedPdf2Doc-rust", rev = "23526acf23c3b58009d8e1b8748a7b99e208b1ee", default-features = false }
 flutter_rust_bridge = "=2.11.1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 anyhow = "1"
